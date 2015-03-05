@@ -1,10 +1,9 @@
 #include <TCanvas.h>
+#include <TLegend.h>
 //#include <TRandom3.h>
 #include "TH1.h"
 #include "TF1.h"
 #include "TMath.h"
-//#include <string>
-//#include <cstring>
 //#include <fstream>
 #include <iostream>
 
@@ -27,12 +26,13 @@ void fun()
 	//canv->SetGrid(1,1)
 	
 	//                   name        fun  m  M
-	//TF1 *f1 = new TF1("Funzione", "x", 0, 10);
+	//TF1 *f1 = new TF1("Function", "x", 0, 10);
 	
 	//                 name        fun*  m  M   npar
 	TF1 *f1 = new TF1("Function", fun1, 0, 10, 0);
-	//fun->SetParameters(0, 1, 2);
-	//fun->SetParNames("c0", "c1", "c2");
+	//f1->SetParameters(0, 1, 2);
+	//f1->SetParNames("c0", "c1", "c2");
+	//f1->SetNpx(1000); // more points
 
 	// use this to set properies of the plot
 	// base_hist->GetWhatever()->SetWhatever();
@@ -45,11 +45,11 @@ void fun()
 	f1->Draw();
 	
 	// add a legend
-	//                         lx    by   rx   ty
-	TLegend *leg = new TLegend(0.7, 0.75, 0.99, 0.9);
-	leg->SetHeader("Legend Title");
-	leg->AddEntry(base_hist, "Function","l");
-	leg->AddEntry("a","Random string","l");
-	leg->Draw();
+	//                           lx    by   rx   ty
+	//TLegend *leg = new TLegend(0.7, 0.75, 0.99, 0.9);
+	//leg->SetHeader("Legend Title");
+	//leg->AddEntry(base_hist, "Function","l");
+	//leg->AddEntry("a","Random string","l");
+	//leg->Draw();
 	
 }
