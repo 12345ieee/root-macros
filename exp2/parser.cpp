@@ -47,7 +47,9 @@ int parse(string path)
 	const int linesize=65536;
 	char* line = (char*)malloc(linesize*sizeof(char));  // get buffer for every line
 	
-	vector<eeevent> evector;
+	vector<eeevent> evector;               // vector of events
+	double hv1, hv2, hv3;                  // variables for high voltage values
+	
 	
 	while (!file.eof()) {
 		file.getline(line, linesize);       // fill line
@@ -59,11 +61,15 @@ int parse(string path)
 		
 		piece = strtok (NULL, " \t");       // get descriptor
 		string descriptor = piece;
+		
 		if (descriptor=="STATUS") {
-			
+			char* next=piece+7;              // hack to get after "STATUS"
+			sscanf(next, "HV %lf %*f %lf %*f %lf %*f", &hv1, &hv2, &hv3); 
+			cout << "hv: " << hv1 << " - " << hv2 << " - " << hv3 << endl;
+			continue;
 		}
 		else if (descriptor=="EVENT") {
-			
+			//cout << "e" << endl;
 		}
 		else continue;
 		
