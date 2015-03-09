@@ -19,7 +19,7 @@ class hit
 	
 	public:
 	
-	hit(double _x, double _y): x(_x), y(_y) {}
+	hit(double x, double y): x(x), y(y) {}
 };
 
 
@@ -36,9 +36,9 @@ class eeevent
 	int clk1;
 	int clk2;
 	
-	vector<hit> event1;
-	vector<hit> event2;
-	vector<hit> event3;
+	vector<hit> events1;
+	vector<hit> events2;
+	vector<hit> events3;
 	
 	double hv1;
 	double hv2;
@@ -54,13 +54,13 @@ class eeevent
 		hit newhit(x, y);
 		switch (z) {
 			case 149:
-				this->event1.push_back(newhit);
+				this->events1.push_back(newhit);
 				break;
 			case 95:
-				this->event2.push_back(newhit);
+				this->events2.push_back(newhit);
 				break;
 			case 49:
-				this->event3.push_back(newhit);
+				this->events3.push_back(newhit);
 				break;
 			default:
 				cout << "Unrecognized chamber" << endl;
@@ -68,7 +68,10 @@ class eeevent
 	}
 };
 
-int parse(string path)
+typedef vector<eeevent> eeevector;
+typedef vector<hit> hitvector;
+
+vector<eeevent> parse(string path)
 {
 	cout << "Path given: " << path << endl;
 	
@@ -77,7 +80,7 @@ int parse(string path)
 	const int linesize=65536;
 	char* line = (char*)malloc(linesize*sizeof(char));  // get buffer for every line
 	
-	vector<eeevent> evector;               // vector of events
+	vector<eeevent> evector;               // vector for the events
 	double hv1, hv2, hv3;                  // variables for high voltage values
 	
 	while (!file.eof()) {
@@ -94,7 +97,7 @@ int parse(string path)
 		if (descriptor=="STATUS") {
 			char* next=piece+7;              // hack to get after "STATUS"
 			sscanf(next, "HV %lf %*f %lf %*f %lf %*f", &hv1, &hv2, &hv3); 
-			cout << "hv: " << hv1 << " - " << hv2 << " - " << hv3 << endl;
+			//cout << "hv: " << hv1 << " - " << hv2 << " - " << hv3 << endl;
 		}
 		else if (descriptor=="EVENT") {
 			
@@ -123,25 +126,56 @@ int parse(string path)
 				double x = atof(piece);
 				piece = strtok (NULL, " \t");    // get more pieces
 				
-				double y = atof(piece);
-				piece = strtok (NULL, " \t");    // get more pieces
-				
-				int z = atoi(piece);
-				piece = strtok (NULL, " \t");    // get more pieces
-				
-				neweeevent.gethit(x, y, z);
+				if (piece!=NULL) {
+					double y = atof(piece);
+					piece = strtok (NULL, " \t");    // get more pieces
+					
+					int z = atoi(piece);
+					piece = strtok (NULL, " \t");    // get more pieces
+					
+					neweeevent.gethit(x, y, z);
+					//cout << x << " - " << y << " - " << z << endl;
+				}
 			}
 			
 			evector.push_back(neweeevent);
 		}
 	}
-
+	cout << "Parsing complete: " << evector.size() << " events captured" << endl;
 	
-	return 0;
+	return evector;
+}
+
+void cluster_size_study(eeevector evector)
+{
+	
+	
 }
 
 int main(int, char** argv)
 {
-	parse(argv[1]);
+	eeevector evector;
+	evector = parse(argv[1]);
+	
+	cluster_size_study(evector);
+	
+	//compute_eff(1, evector);
+	
 	return 0;
 }
+
+
+/* Code graveyard
+*
+* 
+* 
+	hitvector hvector;
+	switch (nchamber) {
+		case 1: hvector=evector.events1; break;
+		case 2: hvector=evector.events2; break;
+		case 3: hvector=evector.events3; break;
+		default: cout << "Unexpected chamber number" << endl;
+	}
+* 
+* 
+*/
