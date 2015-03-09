@@ -25,8 +25,8 @@ class hit
 	
 	double distance_from(hit h)
 	{
-		double Dx2 = pow((this->x-h.x), 2);
-		double Dy2 = pow((this->y-h.y), 2);
+		double Dx2 = pow((this->x - h.x), 2);
+		double Dy2 = pow((this->y - h.y), 2);
 		return sqrt(Dx2 + Dy2);
 	}
 };
@@ -50,9 +50,7 @@ class eeevent
 	
 	public:
 	
-	vector<hit> hits1;
-	vector<hit> hits2;
-	vector<hit> hits3;
+	vector<hit> hits [3];  // array of vector of hit
 	
 	eeevent(int num1, int num_trig, int num_acq, int secs, int nsecs, int clk1, int clk2, double hv1, double hv2, double hv3):
 		num1(num1), num_trig(num_trig), num_acq(num_acq), secs(secs), nsecs(nsecs),
@@ -62,13 +60,13 @@ class eeevent
 		hit newhit(x, y);
 		switch (z) {
 			case 149:
-				this->hits1.push_back(newhit);
+				this->hits[0].push_back(newhit);
 				break;
 			case 95:
-				this->hits2.push_back(newhit);
+				this->hits[1].push_back(newhit);
 				break;
 			case 49:
-				this->hits3.push_back(newhit);
+				this->hits[2].push_back(newhit);
 				break;
 			default:
 				cout << "Unrecognized chamber" << endl;
@@ -85,6 +83,10 @@ vector<eeevent> parse(string path)
 	
 	ifstream file;
 	file.open(path);
+	if (file==NULL) {
+		cout << "File does not exist" << endl;
+		exit(1);
+	}
 	const int linesize=65536;
 	char* line = (char*)malloc(linesize*sizeof(char));  // get buffer for every line
 	
@@ -160,60 +162,23 @@ void cluster_size_study(eeevector evector, double step, double maxradius)
 	TCanvas *canv = new TCanvas("canvas","canvas title",800,600);
 	canv->cd();
 	
-	TH1D *hist = new TH1D("", "Hist title", 1000, 0, 100);
+	TH1D *hist = new TH1D("", "Cluster", maxradius/step-1, 0, maxradius);
 	
-	double radius;
-	int counter;
-	
-	for (radius=0; radius<maxradius; radius+=step) {          // for every radius
-		counter=0;
-		for (size_t i=0; i<evector.size(); ++i) {              // for every event
-			eeevent event1 = evector[i];
-			if (event1.hits1.size() > 1) {                      // if there are hits on ch1
-				for (size_t j=0; j<event1.hits1.size(); ++j) {   // for every hit in ch1
-					hit hit1 = event1.hits1[j];
-					for (size_t k=j+1; k<event1.hits1.size(); ++k) {   // for other hit in ch1
-						hit hit2 = event1.hits1[k];
+	for (size_t i=0; i<evector.size(); ++i) {              // for every event
+		eeevent event1 = evector[i];
+		for (int ch=0; ch<3; ++ch) {                        // for every chamber
+			if (event1.hits[ch].size() > 1) {                      // if there are hits on ch
+				for (size_t j=0; j<event1.hits[ch].size(); ++j) {   // for every hit in ch
+					hit hit1 = event1.hits[ch][j];
+					for (size_t k=j+1; k<event1.hits[ch].size(); ++k) {   // for other hit in ch
+						hit hit2 = event1.hits[ch][k];
 						double dist = hit2.distance_from(hit1);
-						if (dist < radius) {
-							if (hit1.cluster.size() == 0 && hit1.cluster.size() == 0) counter++;
-							hit1.cluster.push_back(hit2);
-							hit2.cluster.push_back(hit1);
+						for (double radius=maxradius; radius > dist; radius-=step) {   // for every radius
+							hist->Fill(radius);
 						}
 					}
 				}
 			}
-			if (event1.hits2.size() > 1) {                      // if there are hits on ch2
-				for (size_t j=0; j<event1.hits2.size(); ++j) {   // for every hit in ch2
-					hit hit1 = event1.hits2[j];
-					for (size_t k=j+1; k<event1.hits2.size(); ++k) {   // for other hit in ch2
-						hit hit2 = event1.hits2[k];
-						double dist = hit2.distance_from(hit1);
-						if (dist < radius) {
-							if (hit1.cluster.size() == 0 && hit1.cluster.size() == 0) counter++;
-							hit1.cluster.push_back(hit2);
-							hit2.cluster.push_back(hit1);
-						}
-					}
-				}
-			}
-			if (event1.hits3.size() > 1) {                      // if there are hits on ch3
-				for (size_t j=0; j<event1.hits3.size(); ++j) {   // for every hit in ch3
-					hit hit1 = event1.hits3[j];
-					for (size_t k=j+1; k<event1.hits3.size(); ++k) {   // for other hit in ch3
-						hit hit2 = event1.hits3[k];
-						double dist = hit2.distance_from(hit1);
-						if (dist < radius) {
-							if (hit1.cluster.size() == 0 && hit1.cluster.size() == 0) counter++;
-							hit1.cluster.push_back(hit2);
-							hit2.cluster.push_back(hit1);
-						}
-					}
-				}
-			}
-		}
-		for (int i=0; i<counter; ++i) {
-			hist->Fill(radius);
 		}
 	}
 	hist->Draw();
@@ -222,8 +187,8 @@ void cluster_size_study(eeevector evector, double step, double maxradius)
 
 int parser(string path)
 {
-	const double step = 0.1;
-	const double maxradius = 100;
+	const double step = 0.01;
+	const double maxradius = 20;
 	
 	eeevector evector;
 	evector = parse(path);
@@ -253,6 +218,12 @@ int main(int, char** argv)
 		case 2: hvector=evector.hits2; break;
 		case 3: hvector=evector.hits3; break;
 		default: cout << "Unexpected chamber number" << endl;
+	}
+*
+	if (dist < radius) {
+		if (hit1.cluster.size() == 0 && hit1.cluster.size() == 0) counter++;
+		hit1.cluster.push_back(hit2);
+		hit2.cluster.push_back(hit1);
 	}
 * 
 * 
