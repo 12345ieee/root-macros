@@ -2,6 +2,7 @@
 //#include <TLegend.h>
 //#include <TRandom3.h>
 #include "TH1.h"
+#include "TH2.h"
 //#include "TF1.h"
 //#include "TMath.h"
 #include <string>
@@ -81,7 +82,7 @@ class eeevent
 typedef vector<eeevent> eeevector;
 typedef vector<hit> hitvector;
 
-vector<eeevent> parse(string path)
+eeevector parse(string path)
 {
 	cout << "Path given: " << path << endl;
 	
@@ -160,12 +161,40 @@ vector<eeevent> parse(string path)
 	return evector;
 }
 
+const double xmax=40;
+const double ymax=84;
+
+void plot_events(int ch, eeevector evector)
+{
+	char name[256];
+	sprintf(name, "canv_ch%d", ch);
+	
+	char title[256];
+	sprintf(title, "Events ch%d", ch);
+	
+	TCanvas *canv = new TCanvas(name,"canvas eff", 800, 600);
+	TH2D *hist = new TH2D("", title, 100, -xmax, xmax, 1000, -ymax, ymax);
+	
+	
+	for (size_t i=0; i<evector.size(); ++i) {              // for every event
+		eeevent event1 = evector[i];
+		for (size_t j=0; j<event1.hits[ch].size(); ++j) {   // for every hit in ch
+			hit hit1 = event1.hits[ch][j];
+			hist->Fill(hit1.x, hit1.y);
+		}
+	}
+	
+	canv->cd();
+	hist->Draw("colz");
+	
+	cout << "Chamber " << ch << ": " << hist->Integral() << " events" << endl << endl;
+}
+
 void cluster_size_study(eeevector evector)
 {
 	const double step = 0.01;
 	const double maxradius = 20;
 	
-	// Create the canvas
 	TCanvas *canv = new TCanvas("canvas","canvas title", 800, 600);
 	canv->cd();
 	TH1D *hist = new TH1D("", "Cluster", maxradius/step-1, 0, maxradius);
@@ -226,15 +255,42 @@ hit compute_hitpoint(int chtest, hit hit1, hit hit2)
 
 void compute_eff(int chtest, eeevector evector)
 {
-	const double xmax=2000;
-	const double ymax=2000;
-	const double dist_cutoff=10;
+	const double dist_cutoff=3;
+	
+	char name_exp[256];
+	sprintf(name_exp, "canv_exp_ch%d", chtest);
+	char name_det[256];
+	sprintf(name_det, "canv_det_ch%d", chtest);
+	char name_eff[256];
+	sprintf(name_eff, "canv_eff_ch%d", chtest);
+	
+	char title_exp[256];
+	sprintf(title_exp, "Expected ch%d", chtest);
+	char title_det[256];
+	sprintf(title_det, "Detected ch%d", chtest);
+	char title_eff[256];
+	sprintf(title_eff, "Efficiency ch%d", chtest);
+	
+	TCanvas *canv_exp = new TCanvas(name_exp,"canvas exp", 800, 600);
+	TH2D *hist_exp = new TH2D("", title_exp, 100, -xmax, xmax, 1000, -ymax, ymax);
+	TCanvas *canv_det = new TCanvas(name_det,"canvas det", 800, 600);
+	TH2D *hist_det = new TH2D("", title_det, 100, -xmax, xmax, 1000, -ymax, ymax);
+	TCanvas *canv_eff = new TCanvas(name_eff,"canvas eff", 800, 600);
+	TH2D *hist_eff = new TH2D("", title_eff, 100, -xmax, xmax, 1000, -ymax, ymax);
 	
 	int expected=0;
 	int detected=0;
 	
 	int ch1, ch2;
 	chamber_assign(chtest, &ch1, &ch2);
+	
+	char name_nhits[256];
+	sprintf(name_nhits, "canv_nhits_ch%d", chtest);
+	char title_nhits[256];
+	sprintf(title_eff, "Hits number ch%d", chtest);
+	
+	TCanvas *canv_nhits = new TCanvas(name_nhits,"canvas nits", 800, 600);
+	TH1D *hist_nhits = new TH1D("", title_nhits, 10, 0, 10);
 	
 	for (size_t i=0; i<evector.size(); ++i) {              // for every event
 		eeevent event1 = evector[i];
@@ -244,24 +300,111 @@ void compute_eff(int chtest, eeevector evector)
 				hit hit2 = event1.hits[ch2][k];
 				hit hit_test = compute_hitpoint(chtest, hit1, hit2);
 				if (hit_test.is_inside(xmax, ymax)) {
+					int counter=0;
 					expected++;
+					hist_exp->Fill(hit_test.x, hit_test.y);
 					for (size_t h=0; h<event1.hits[chtest].size(); ++h) {   // for every hit in chtest
 						hit hitf = event1.hits[chtest][h];
 						double dist = hit_test.distance_from(hitf);
 						if (dist < dist_cutoff) {
 							detected++;
-							break;
+							hist_det->Fill(hitf.x, hitf.y);
+							counter++;
 						}
 					}
+					hist_nhits->Fill(counter);
 				}
 			}
 		}
 	}
+	
+	canv_nhits->cd();
+	hist_nhits->Draw();
+	
+	canv_exp->cd();
+	hist_exp->Draw();
+	
+	canv_det->cd();
+	hist_det->Draw();
+	
+	hist_eff->Divide(hist_det, hist_exp);
+	canv_eff->cd();
+	hist_eff->Draw("colz");
+	
+	cout << "Chamber " << chtest << ":" << endl;
 	cout << "Distance cutoff chosen: " << dist_cutoff << endl;
 	cout << "Expected events: " << expected << endl;
 	cout << "Detected events: " << detected << endl;
 	cout << "Efficiency: " << (double)detected/expected << endl << endl;
+}
+
+void single_events_fitter(eeevector evector)
+{
+	eeevector goodevents[3];  // events good for chamber ch
+	eeevector perfevents;     // events with a single hit/ch
+	for (size_t i=0; i != evector.size(); ++i) {  // for every event
+		int counter=0;
+		eeevent event1=evector[i];
+		if (event1.hits[0].size()==1) counter+=1;
+		if (event1.hits[1].size()==1) counter+=2;
+		if (event1.hits[2].size()==1) counter+=4;
+		if (counter==3 || counter==7) goodevents[2].push_back(event1);
+		if (counter==5 || counter==7) goodevents[1].push_back(event1);
+		if (counter==6 || counter==7) goodevents[0].push_back(event1);
+		if (counter==7) perfevents.push_back(event1);
+		if (counter>7) cout << "Unrecognized counter" << endl;
+	}
+	for (int ch=0; ch<3; ++ch) {
+		cout << "Good events for ch" << ch << ": " << goodevents[ch].size() << endl;
+	}
+	cout << "Perfect events: " << perfevents.size() << endl << endl;
 	
+	
+	//~ for (size_t i=0; i<perfevents.size(); ++i) {              // for every event
+		//~ eeevent event1 = perfrvents[i];
+		//~ hit hit0 = event1.hits[0][0];
+		//~ hit hit1 = event1.hits[1][0];
+		//~ hit hit2 = event1.hits[2][0];
+		//~ hit hit_test = compute_hitpoint(chtest, hit1, hit2);
+		//~ if (hit_test.is_inside(xmax, ymax)) {
+			//~ int counter=0;
+			//~ expected++;
+			//~ hist_exp->Fill(hit_test.x, hit_test.y);
+			//~ for (size_t h=0; h<event1.hits[chtest].size(); ++h) {   // for every hit in chtest
+				//~ hit hitf = event1.hits[chtest][h];
+				//~ double dist = hit_test.distance_from(hitf);
+				//~ if (dist < dist_cutoff) {
+					//~ detected++;
+					//~ hist_det->Fill(hitf.x, hitf.y);
+					//~ counter++;
+				//~ }
+			//~ }
+			//~ hist_nhits->Fill(counter);
+		//~ }
+	//~ }
+}
+
+void average_hit_number(eeevector evector)
+{
+	for (int ch=0; ch<3; ++ch) {
+		char name[256];
+		sprintf(name, "canv_hits_ch%d", ch);
+		
+		char title[256];
+		sprintf(title, "Hit number ch%d", ch);
+		
+		TCanvas *canv = new TCanvas(name,"canvas", 800, 600);
+		int nbins=20;
+		TH1I *hist = new TH1I("", title, nbins, 0, nbins);
+		
+		for (size_t i=0; i != evector.size(); ++i) {  // for every event
+			int nhits=evector[i].hits[ch].size();
+			hist->Fill(nhits);
+		}
+		
+		canv->cd();
+		hist->Draw();
+	}
 }
 
 int parser(string path)
@@ -270,11 +413,17 @@ int parser(string path)
 	eeevector evector;
 	evector = parse(path);
 	
-
+	//for (int i = 0; i < 3; i++) plot_events(i, evector);
+	 
 	//cluster_size_study(evector);
 	//evector = clusterize(evector, cluster_size);
+	 
+	//for (int i = 0; i < 3; i++) compute_eff(i, evector);
 	
-	compute_eff(1, evector);
+	average_hit_number(evector);
+	
+	single_events_fitter(evector);
+	
 	
 	return 0;
 }
