@@ -39,6 +39,30 @@ class hit
 	}
 };
 
+// eee
+// calib
+
+//~ const int z0 = 145;
+//~ const int z1 = 100;
+//~ const int z2 = 23;
+const int z0 = 149;
+const int z1 = 95;
+const int z2 = 49;
+
+//~ const double xmin = -60;
+//~ const double xmax = +50;
+//~ const double xratio = 5;
+const double xmin = -46.5;
+const double xmax = 42.63;
+const double xratio = 3.875;
+
+//~ const double ymax = 129;
+//~ double yacc=0;  // to include the offset
+//~ double ydraw=1; // for better plots
+const double ymax = 129;
+double yacc=0;  // to include the offset
+double ydraw=1; // for better plots
+
 class eeevent
 {
 	int num1;
@@ -67,13 +91,13 @@ class eeevent
 	void gethit(double x, double y, int z) {
 		hit newhit(x, y);
 		switch (z) {
-			case 145:
+			case z0:
 				this->hits[0].push_back(newhit);
 				break;
-			case 100:
+			case z1:
 				this->hits[1].push_back(newhit);
 				break;
-			case 23:
+			case z2:
 				this->hits[2].push_back(newhit);
 				break;
 			default:
@@ -88,15 +112,6 @@ class eeevent
 
 typedef vector<eeevent> eeevector;
 typedef vector<hit> hitvector;
-
-const double xmin = -60;
-const double xmax = +50;
-const double xbin = 3.2;
-const double xratio = 5;
-
-const double ymax = 129;
-double yacc=0;  // to include the offset
-double ydraw=1; // for better plots
 
 void correct_coords (double* x, double* y) 
 {
@@ -401,8 +416,54 @@ void voltage(eeevector evector)
 	g2->Draw("same");
 }
 
+void single_events_fitter(eeevector evector)
+{
+	eeevector goodevents[3];  // events good for chamber ch
+	eeevector perfevents;     // events with a single hit/ch
+	for (size_t i=0; i != evector.size(); ++i) {  // for every event
+		int counter=0;
+		eeevent event1=evector[i];
+		if (event1.hits[0].size()==1) counter+=1;
+		if (event1.hits[1].size()==1) counter+=2;
+		if (event1.hits[2].size()==1) counter+=4;
+		if (counter==3 || counter==7) goodevents[2].push_back(event1);
+		if (counter==5 || counter==7) goodevents[1].push_back(event1);
+		if (counter==6 || counter==7) goodevents[0].push_back(event1);
+		if (counter==7) perfevents.push_back(event1);
+		if (counter>7) cout << "Unrecognized counter" << endl;
+	}
+	for (int ch=0; ch<3; ++ch) {
+		cout << "Good events for ch" << ch << ": " << goodevents[ch].size() << endl;
+	}
+	cout << "Perfect events: " << perfevents.size() << endl << endl;
+	
+	
+	//~ for (size_t i=0; i<perfevents.size(); ++i) {              // for every event
+		//~ eeevent event1 = perfrvents[i];
+		//~ hit hit0 = event1.hits[0][0];
+		//~ hit hit1 = event1.hits[1][0];
+		//~ hit hit2 = event1.hits[2][0];
+		//~ hit hit_test = compute_hitpoint(chtest, hit1, hit2);
+		//~ if (hit_test.is_inside(xmax, ymax)) {
+			//~ int counter=0;
+			//~ expected++;
+			//~ hist_exp->Fill(hit_test.x, hit_test.y);
+			//~ for (size_t h=0; h<event1.hits[chtest].size(); ++h) {   // for every hit in chtest
+				//~ hit hitf = event1.hits[chtest][h];
+				//~ double dist = hit_test.distance_from(hitf);
+				//~ if (dist < dist_cutoff) {
+					//~ detected++;
+					//~ hist_det->Fill(hitf.x, hitf.y);
+					//~ counter++;
+				//~ }
+			//~ }
+			//~ hist_nhits->Fill(counter);
+		//~ }
+	//~ }
+}
 
-int parser(string path, int mode=2)
+
+int parser(string path, int mode=1)
 {
 	
 	eeevector evector;
