@@ -3,13 +3,16 @@
 //#include <TRandom3.h>
 #include "TH1.h"
 #include "TH2.h"
+#include "TGraph.h"
 //#include "TF1.h"
 //#include "TMath.h"
 #include <string>
 #include <cstring>
+#include <sstream>
 #include <fstream>
 #include <iostream>
 #include <vector>
+#include "TSystemDirectory.h"
 
 using namespace std;
 
@@ -82,7 +85,7 @@ class eeevent
 typedef vector<eeevent> eeevector;
 typedef vector<hit> hitvector;
 
-eeevector parse(string path)
+eeevector parse_file(string path, eeevector evector1)
 {
 	cout << "Path given: " << path << endl;
 	
@@ -95,7 +98,7 @@ eeevector parse(string path)
 	const int linesize=65536;
 	char* line = (char*)malloc(linesize*sizeof(char));  // get buffer for every line
 	
-	vector<eeevent> evector;               // vector for the events
+	eeevector evector;
 	double hv1, hv2, hv3;                  // variables for high voltage values
 	
 	while (!file.eof()) {
@@ -157,14 +160,35 @@ eeevector parse(string path)
 		}
 	}
 	cout << "Parsing completed: " << evector.size() << " events captured" << endl << endl;
-	
 	return evector;
 }
 
-const double xmax=40;
-const double ymax=84;
+void parse_dir(const char* dirname, eeevector evector)
+{
+	TSystemDirectory dir(dirname, dirname);
+	string dirnames(dirname);
+	TList *files = dir.GetListOfFiles();
+	if (files) {
+		TSystemFile *file;
+		TString fname;
+		TIter next(files);
+		while ((file=(TSystemFile*)next())) {
+			fname = file->GetName();
+			if (!file->IsDirectory() && fname.BeginsWith("PISA")) {
+				stringstream s;
+				s << fname;
+				parse_file(dirnames + s.str(), evector);
+			}
+		}
+	}
+}
 
-void plot_events(int ch, eeevector evector)
+const double xmin= -46.5;
+const double xmax= 43.63;
+const double xbin = (xmax-xmin)/24;
+const double ymax= 84;
+
+void plot_events(int ch, eeevector evector, double* medians, double* means)
 {
 	char name[256];
 	sprintf(name, "canv_ch%d", ch);
@@ -172,8 +196,10 @@ void plot_events(int ch, eeevector evector)
 	char title[256];
 	sprintf(title, "Events ch%d", ch);
 	
-	TCanvas *canv = new TCanvas(name,"canvas eff", 800, 600);
-	TH2D *hist = new TH2D("", title, 100, -xmax, xmax, 1000, -ymax, ymax);
+	double yacc=20;  // to include the offset
+	
+	TCanvas *canv = new TCanvas(name,"canvas ev", 800, 600);
+	TH2D *hist = new TH2D("", title, 24, xmin, xmax, 120, -ymax-yacc, ymax+yacc);
 	
 	
 	for (size_t i=0; i<evector.size(); ++i) {              // for every event
@@ -183,11 +209,25 @@ void plot_events(int ch, eeevector evector)
 			hist->Fill(hit1.x, hit1.y);
 		}
 	}
+	//double x_mean = hist->GetMean() << endl;
 	
 	canv->cd();
 	hist->Draw("colz");
 	
-	cout << "Chamber " << ch << ": " << hist->Integral() << " events" << endl << endl;
+	//TCanvas *canv1 = new TCanvas(strcat(name, "_1"),"canvas ev1", 800, 600);
+	//canv1->cd();
+	
+	double prob[1]={0.5};
+	printf("Bin\tMean\tMedian\n");
+	for (int bin=0; bin<24; bin++) {   // compute median and mean
+		TH1D *hist1 = hist->ProjectionY(strcat(title, " bin"), bin, bin+1);
+		hist1->GetQuantiles(1, medians+bin, prob);
+		means[bin] = hist1->GetMean();
+		cout << bin << "\t" << means[bin] << "\t" << medians[bin] << endl;
+	}
+	//hist1->Draw();
+	
+	cout << endl << "Chamber " << ch << ": " << hist->Integral() << " events" << endl << endl;
 }
 
 void cluster_size_study(eeevector evector)
@@ -272,11 +312,11 @@ void compute_eff(int chtest, eeevector evector)
 	sprintf(title_eff, "Efficiency ch%d", chtest);
 	
 	TCanvas *canv_exp = new TCanvas(name_exp,"canvas exp", 800, 600);
-	TH2D *hist_exp = new TH2D("", title_exp, 100, -xmax, xmax, 1000, -ymax, ymax);
+	TH2D *hist_exp = new TH2D("", title_exp, 100, xmin, xmax, 1000, -ymax, ymax);
 	TCanvas *canv_det = new TCanvas(name_det,"canvas det", 800, 600);
-	TH2D *hist_det = new TH2D("", title_det, 100, -xmax, xmax, 1000, -ymax, ymax);
+	TH2D *hist_det = new TH2D("", title_det, 100, xmin, xmax, 1000, -ymax, ymax);
 	TCanvas *canv_eff = new TCanvas(name_eff,"canvas eff", 800, 600);
-	TH2D *hist_eff = new TH2D("", title_eff, 100, -xmax, xmax, 1000, -ymax, ymax);
+	TH2D *hist_eff = new TH2D("", title_eff, 100, xmin, xmax, 1000, -ymax, ymax);
 	
 	int expected=0;
 	int detected=0;
@@ -407,22 +447,79 @@ void average_hit_number(eeevector evector)
 	}
 }
 
+void plot_offset(double medians[3][24], double means[3][24])
+{
+	const double strips[24]={-12,-11,-10,-9,-8,-7,-6,-5,-4,-3,-2,-1,0,1,2,3,4,5,6,7,8,9,10,11};
+	for (int ch=0; ch<3 ; ch++) {
+		char name_med[256];
+		sprintf(name_med, "canv_med_ch%d", ch);
+		
+		char title_med[256];
+		sprintf(title_med, "Medians ch%d", ch);
+		
+		TCanvas *canv_med = new TCanvas(name_med,"canvas med", 800, 600);
+		TGraph *g_med = new TGraph(24, strips, medians[ch]);
+		g_med->SetTitle(title_med);
+		canv_med->cd();
+		g_med->Draw("AB");
+		
+		char name_mea[256];
+		sprintf(name_mea, "canv_mea_ch%d", ch);
+		
+		char title_mea[256];
+		sprintf(title_mea, "Means ch%d", ch);
+		
+		TCanvas *canv_mea = new TCanvas(name_mea,"canvas mea", 800, 600);
+		TGraph *g_mea = new TGraph(24, strips, means[ch]);
+		g_mea->SetTitle(title_mea);
+		canv_mea->cd();
+		g_mea->Draw("AB");
+	}
+}
+
+void rescale_offset(eeevector* evector, double offsets[3][24])
+{
+	for (size_t evn=0; evn < (*evector).size(); ++evn) {
+		for (int ch=0; ch < 3; ++ch) {
+			hitvector hits = (*evector)[evn].hits[ch];
+			for (size_t hitn=0; hitn < hits.size(); ++hitn) {
+				int bin = hits[hitn].x/xbin+12;
+				cout << bin << endl;
+				//cout << hits[hitn].y << " - ";
+				hits[hitn].y -= offsets[ch][bin];
+				//cout << hits[hitn].y << endl;
+			}
+		}
+	}
+}
+
 int parser(string path)
 {
 	
 	eeevector evector;
-	evector = parse(path);
+	//evector = parse_file(path, evector);
+	parse_dir(path.c_str(), evector);
 	
-	//for (int i = 0; i < 3; i++) plot_events(i, evector);
-	 
+	double medians[3][24];
+	double means[3][24];
+	
+	for (int i = 0; i < 3; i++) plot_events(i, evector, medians[i], means[i]);
+	//~ plot_offset(medians, means);
+	//~ 
+	//~ rescale_offset(&evector, medians);
+	//~ 
+	//~ for (int i = 0; i < 3; i++) plot_events(i, evector, medians[i], means[i]);
+	//~ plot_offset(medians, means);
+	
+	
 	//cluster_size_study(evector);
 	//evector = clusterize(evector, cluster_size);
 	 
 	//for (int i = 0; i < 3; i++) compute_eff(i, evector);
 	
-	average_hit_number(evector);
+	//average_hit_number(evector);
 	
-	single_events_fitter(evector);
+	//single_events_fitter(evector);
 	
 	
 	return 0;
