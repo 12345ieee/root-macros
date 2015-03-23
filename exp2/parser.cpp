@@ -39,29 +39,25 @@ class hit
 	}
 };
 
+const double chnum = 3;
+
 // eee
 // calib
 
-const int z0 = 145;
-const int z1 = 100;
-const int z2 = 23;
-//~ const int z0 = 149;
-//~ const int z1 = 95;
-//~ const int z2 = 49;
-//~ 
-const double xmin = -60;
-const double xmax = +50;
-const double xratio = 5;
-//~ const double xmin = -46.5;
-//~ const double xmax = 42.63;
-//~ const double xratio = 3.875;
-//~ 
-const double ymax = 129;
-double yacc=0;  // to include the offset
-double ydraw=1; // for better plots
-//~ const double ymax = 129;
-//~ double yacc=0;  // to include the offset
-//~ double ydraw=1; // for better plots
+const int z0t = 145;
+const int z1t = 100;
+const int z2t = 23;
+const int z0  = 149;
+const int z1  = 95;
+const int z2  = 49;
+ 
+const double xmin = -0.5;
+const double xmax = 23.5;
+
+const double ymax = 168;
+
+double yacc =100;  // to include the offset
+double ydraw=1;  // for better plots
 
 const int dx=1;
 const double dy=2;
@@ -95,12 +91,15 @@ class eeevent
 		hit newhit(x, y);
 		switch (z) {
 			case z0:
+			case z0t:
 				this->hits[0].push_back(newhit);
 				break;
 			case z1:
+			case z1t:
 				this->hits[1].push_back(newhit);
 				break;
 			case z2:
+			case z2t:
 				this->hits[2].push_back(newhit);
 				break;
 			default:
@@ -116,13 +115,22 @@ class eeevent
 typedef vector<eeevent> eeevector;
 typedef vector<hit> hitvector;
 
-void correct_coords (double* x, double* y) 
+void correct_coords (double* x, double* y, string mode) 
 {
-	*x = ((*x)-xmin)/xratio;
-	*y = *y;
+	double xmin = -60;
+	double xstep =  5;
+	double yratio = 1.22;
+	
+	if (mode=="calib") {
+		xmin = -46.5;
+		xstep=  3.875;
+		yratio= 2.153;
+	}
+	*x = round(((*x)-xmin)/xstep);
+	*y = (*y)*yratio;
 }
 
-eeevector parse_file(string path, eeevector& evector)
+void parse_file(string path, eeevector& evector, string mode)
 {
 	cout << "Path given: " << path << endl;
 	
@@ -197,7 +205,7 @@ eeevector parse_file(string path, eeevector& evector)
 					int z = atoi(piece);
 					piece = strtok (NULL, " \t");    // get more pieces
 					
-					correct_coords(&x, &y);
+					correct_coords(&x, &y, mode);
 					
 					neweeevent.gethit(x, y, z);
 					//cout << x << " - " << y << " - " << z << endl;
@@ -208,10 +216,9 @@ eeevector parse_file(string path, eeevector& evector)
 		}
 	}
 	cout << "Parsing completed: " << evector.size() << " events captured" << endl << endl;
-	return evector;
 }
 
-void parse_dir(const char* dirname, eeevector& evector)
+void parse_dir(const char* dirname, eeevector& evector, string mode)
 {
 	TSystemDirectory dir(dirname, dirname);
 	string dirnames(dirname);
@@ -226,7 +233,7 @@ void parse_dir(const char* dirname, eeevector& evector)
 			if (!file->IsDirectory() && fname.BeginsWith("PISA")) {
 				stringstream s;
 				s << fname;
-				parse_file(dirnames + s.str(), evector);
+				parse_file(dirnames + s.str(), evector, mode);
 			}
 		}
 	}
@@ -242,7 +249,7 @@ void plot_events(int ch, eeevector evector, double* medians, double* means)
 	sprintf(title, "Events ch%d", ch);
 	
 	TCanvas *canv = new TCanvas(name,"canvas ev", 800, 600);
-	TH2D *hist = new TH2D("", title, 24, -0.5, 23.5, ymax/ydraw, -ymax-yacc, ymax+yacc);
+	TH2D *hist = new TH2D("", title, 24, xmin, xmax, ymax/ydraw, -ymax-yacc, ymax+yacc);
 	
 	
 	for (size_t i=0; i<evector.size(); ++i) {              // for every event
@@ -260,9 +267,15 @@ void plot_events(int ch, eeevector evector, double* medians, double* means)
 	double prob[1]={0.5};
 	printf("Bin\tMean\t\tMedian\n");
 	for (int bin=0; bin<24; bin++) {   // compute median and mean
-		TH1D *hist1 = hist->ProjectionY(strcat(title, " bin"), bin, bin+1);
-		hist1->GetQuantiles(1, medians+bin, prob);
-		means[bin] = hist1->GetMean();
+		TH1D *hist1 = hist->ProjectionY(strcat(title, " bin"), bin+1, bin+1);
+		if (hist1->GetEntries() > 0) {
+			hist1->GetQuantiles(1, medians+bin, prob);
+			means[bin] = hist1->GetMean();
+		}
+		else {
+			medians[bin]=0;
+			means[bin]=0;
+		}
 		cout << bin << "\t" << means[bin] << "\t\t" << medians[bin] << endl;
 	}
 	//hist1->Draw();
@@ -283,7 +296,7 @@ void plot_offset(double medians[3][24], double means[3][24], double resolutions[
 		TCanvas *canv_med = new TCanvas(name_med,"canvas med", 800, 600);
 		TGraph *g_med = new TGraph(24, strips, medians[ch]);
 		g_med->SetTitle(title_med);
-		g_med->GetXaxis()->SetLimits(-0.5, 23.5);  
+		g_med->GetXaxis()->SetLimits(xmin, xmax);  
 		canv_med->cd();
 		g_med->Draw("AB");
 		
@@ -296,7 +309,7 @@ void plot_offset(double medians[3][24], double means[3][24], double resolutions[
 		TCanvas *canv_mea = new TCanvas(name_mea,"canvas mea", 800, 600);
 		TGraph *g_mea = new TGraph(24, strips, means[ch]);
 		g_mea->SetTitle(title_mea);
-		g_mea->GetXaxis()->SetLimits(-0.5, 23.5); 
+		g_mea->GetXaxis()->SetLimits(xmin, xmax); 
 		canv_mea->cd();
 		g_mea->Draw("AB");
 		
@@ -309,7 +322,7 @@ void plot_offset(double medians[3][24], double means[3][24], double resolutions[
 		TCanvas *canv_res = new TCanvas(name_res,"canvas res", 800, 600);
 		TGraph *g_res = new TGraph(24, strips, resolutions[ch]);
 		g_res->SetTitle(title_res);
-		g_res->GetXaxis()->SetLimits(-0.5, 23.5); 
+		g_res->GetXaxis()->SetLimits(xmin, xmax); 
 		canv_res->cd();
 		g_res->Draw("AB");
 	}
@@ -343,7 +356,7 @@ void cut_y(eeevector& evector)
 		char title[256];
 		sprintf(title, "Events ch%d", ch);
 		
-		TH2D *hist = new TH2D("", title, 24, -0.5, 23.5, ymax, -ymax-yacc, ymax+yacc);
+		TH2D *hist = new TH2D("", title, 24, xmin, xmax, ymax/ydraw, -ymax-yacc, ymax+yacc);
 		
 		for (size_t i=0; i<evector.size(); ++i) {              // for every event
 			eeevent event1 = evector[i];
@@ -480,11 +493,11 @@ void single_events_fitter(eeevector evector)
 		sprintf(title_eff, "Efficiency ch%d", ch);
 		
 		TCanvas *canv_exp = new TCanvas(name_exp,"canvas exp", 800, 600);
-		TH2D *hist_exp = new TH2D("", title_exp, 24, -0.5, 23.5, ymax/ydraw, -ymax-yacc, ymax+yacc);
+		TH2D *hist_exp = new TH2D("", title_exp, 24, xmin, xmax, ymax/ydraw, -ymax-yacc, ymax+yacc);
 		TCanvas *canv_det = new TCanvas(name_det,"canvas det", 800, 600);
-		TH2D *hist_det = new TH2D("", title_det, 24, -0.5, 23.5, ymax/ydraw, -ymax-yacc, ymax+yacc);
+		TH2D *hist_det = new TH2D("", title_det, 24, xmin, xmax, ymax/ydraw, -ymax-yacc, ymax+yacc);
 		TCanvas *canv_eff = new TCanvas(name_eff,"canvas eff", 800, 600);
-		TH2D *hist_eff = new TH2D("", title_eff, 24, -0.5, 23.5, ymax/ydraw, -ymax-yacc, ymax+yacc);
+		TH2D *hist_eff = new TH2D("", title_eff, 24, xmin, xmax, ymax/ydraw, -ymax-yacc, ymax+yacc);
 		
 		for (size_t i=0; i<goodevents[ch].size(); ++i) {              // for every event
 			eeevent event1 = goodevents[ch][i];
@@ -515,12 +528,16 @@ void single_events_fitter(eeevector evector)
 }
 
 
-int parser(string path, int mode=2)
+int parser(string path, string mode="eee")
 {
 	
 	eeevector evector;
-	if (mode == 1) evector = parse_file(path, evector);
-	if (mode == 2) parse_dir(path.c_str(), evector);
+	if (mode == "calib") parse_file(path, evector, mode);
+	else if (mode == "eee") parse_dir(path.c_str(), evector, mode);
+	else {
+		cout << "Mode unrecognized" << endl;
+		exit(1);
+	}
 	
 	double medians[3][24];
 	double means[3][24];
@@ -537,7 +554,7 @@ int parser(string path, int mode=2)
 	for (int i = 0; i < 3; i++) plot_events(i, evector, medians[i], means[i]);
 	//plot_offset(medians, means, resolutions);
 	
-	single_events_fitter(evector);
+	//single_events_fitter(evector);
 	
 	//cut_y(evector);                // needed just one time
 	//average_hit_number(evector);   // needed just one time
@@ -557,12 +574,13 @@ int parser(string path, int mode=2)
 int main(int, char** argv)
 {
 	string path = argv[1];
-	int mode = atoi(argv[2]);
+	string mode = argv[2];
 	parser(path, mode);
 	
 	return 0;
 }
 
+/*
 void cluster_size_study(eeevector evector)
 {
 	const double step = 0.01;
@@ -598,7 +616,7 @@ void chamber_assign(int chtest, int* ch1, int* ch2)
 {
 	switch (chtest) {
 		case 0: *ch1 = 1; *ch2 = 2; break;
-		case 1: *ch1 = 0; *ch2 = 2; break;
+		case 1: *ch1 = 2; *ch2 = 0; break;
 		case 2: *ch1 = 0; *ch2 = 1; break;
 		default: cout << "Unrecognized chamber" << endl;
 	}
@@ -734,7 +752,7 @@ void compute_eff(int chtest, eeevector evector)
 		//~ }
 	//~ }
 //~ }
-
+*/
 /* Code graveyard
 *
 * 
