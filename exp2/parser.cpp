@@ -4,8 +4,8 @@
 #include "TH1.h"
 #include "TH2.h"
 #include "TGraph.h"
-//#include "TF1.h"
-//#include "TMath.h"
+#include "TF1.h"
+#include "TMath.h"
 #include <string>
 #include <cstring>
 #include <sstream>
@@ -18,8 +18,8 @@ const int chnum = 3;
 
 const double xmin_scint=   5;
 const double xmax_scint=  18;
-const double ymin_scint= -90;
-const double ymax_scint= +90;
+const double ymin_scint= -45;
+const double ymax_scint= +45;
 
 using namespace std;
 
@@ -61,14 +61,15 @@ const int z2  = 49;
 const double xmin = -0.5;
 const double xmax = 23.5;
 
-const double ymax = 168;
+const double ymax = 84;
 
 const int dx=1;
-const double dy[chnum]={3.7,3.9,3.8};
-const double dy_corr[chnum]={9.65,4.79,8.82};
+const double dy[chnum]={1.5,1.6,1.5};
+const double dy_corr[chnum]={7.8, 3.8, 6.6}; // 2 sigma
 
-double yacc =0;  // to include the offset
-double ydraw=(dy[0]+dy[1]+dy[2])/3; // to account for resolution
+const double yacc =0;  // to include the offset
+const double yres = (dy[0]+dy[1]+dy[2])/3;
+const double ydraw= yres/2*4; // to account for resolution
 
 class eeevent
 {
@@ -108,6 +109,7 @@ class eeevent
 				break;
 			case z2:
 			case z2t:
+				if (x!=18)  // kill dead channel on calib data
 				this->hits[2].push_back(newhit);
 				break;
 			default:
@@ -127,12 +129,12 @@ void correct_coords (double* x, double* y, string mode)
 {
 	double xmin = -60;
 	double xstep =  5;
-	double yratio = 1.25;
+	double yratio = 0.64;
 	
 	if (mode=="calib") {
 		xmin = -46.5;
 		xstep=  3.875;
-		yratio*= 15./8.5;
+		yratio*= 15./17.;
 	}
 	*x = round(((*x)-xmin)/xstep);
 	*y = (*y)*yratio;
@@ -254,7 +256,7 @@ void plot_events(int ch, eeevector evector, double* medians, double* means)
 	sprintf(name, "canv_ch%d", ch);
 	
 	char title[256];
-	sprintf(title, "Events ch%d", ch);
+	sprintf(title, "Eventi ch%d", ch+1); //IT
 	
 	TCanvas *canv = new TCanvas(name,"canvas ev", 800, 600);
 	TH2D *hist = new TH2D("", title, 24, xmin, xmax, ymax/ydraw, -ymax-yacc, ymax+yacc);
@@ -269,6 +271,7 @@ void plot_events(int ch, eeevector evector, double* medians, double* means)
 	}
 	
 	canv->cd();
+	hist->SetStats(kFALSE);
 	hist->Draw("colz");
 	
 	
@@ -462,7 +465,7 @@ hit compute_hitpoint(int chtest, hit hit1, hit hit2)
 	return {x, y};
 } 
 
-void single_events_fitter(eeevector evector)
+void efficiency_calculator(eeevector evector)
 {
 	eeevector goodevents[3];  // events good for chamber ch
 	eeevector perfevents;     // events with a single hit/ch
@@ -522,7 +525,7 @@ void single_events_fitter(eeevector evector)
 		sprintf(title, "Distribution of reconstructed points in y ch%d", ch);
 		
 		canv_diffy[ch] = new TCanvas(name,"canvas diffy", 800, 600);
-		hist_diffy[ch] = new TH1D("", title, ymax/ydraw, -ymax-yacc, ymax+yacc);
+		hist_diffy[ch] = new TH1D("", title, ymax, -ymax-yacc, ymax+yacc);
 	}
 	
 	for (int ch=0; ch < 3; ++ch) {
@@ -539,7 +542,7 @@ void single_events_fitter(eeevector evector)
 		char title_det[256];
 		sprintf(title_det, "Detected ch%d", ch);
 		char title_eff[256];
-		sprintf(title_eff, "Efficiency ch%d", ch);
+		sprintf(title_eff, "Efficienza ch%d", ch+1); //IT
 		
 		//TCanvas *canv_exp = new TCanvas(name_exp,"canvas exp", 800, 600);
 		TH2D *hist_exp = new TH2D("", title_exp, 24, xmin, xmax, ymax/ydraw, -ymax-yacc, ymax+yacc);
@@ -547,6 +550,8 @@ void single_events_fitter(eeevector evector)
 		TH2D *hist_det = new TH2D("", title_det, 24, xmin, xmax, ymax/ydraw, -ymax-yacc, ymax+yacc);
 		TCanvas *canv_eff = new TCanvas(name_eff,"canvas eff", 800, 600);
 		TH2D *hist_eff = new TH2D("", title_eff, 24, xmin, xmax, ymax/ydraw, -ymax-yacc, ymax+yacc);
+		
+		int seen=0;
 		
 		for (size_t i=0; i<goodevents[ch].size(); ++i) {              // for every event
 			eeevent event1 = goodevents[ch][i];
@@ -562,6 +567,7 @@ void single_events_fitter(eeevector evector)
 						hist_diffy[ch]->Fill(hitf.y - hit_test.y);
 						if (abs(hitf.x - hit_test.x) <= dx && abs(hitf.y - hit_test.y) <= dy_corr[ch]) {
 							hist_det->Fill(hitf.x, hitf.y);
+							seen++;
 							break;
 						}
 					}
@@ -572,11 +578,11 @@ void single_events_fitter(eeevector evector)
 				if (!hit2.is_inside_scint()) hist_noi[(ch+2)%3]->Fill(hit2.x, hit2.y);
 			}
 		}
-		//canv_exp->cd();
-		//hist_exp->Draw();
-		 
-		//canv_det->cd();
-		//hist_det->Draw();
+		//~ canv_exp->cd();
+		//~ hist_exp->Draw();
+		//~ 
+		//~ canv_det->cd();
+		//~ hist_det->Draw();
 		
 		for (int binx=0; binx < hist_det->GetNbinsX(); ++binx) {
 			for (int biny=0; biny < hist_det->GetNbinsY(); ++biny) {
@@ -586,31 +592,128 @@ void single_events_fitter(eeevector evector)
 			}
 		}
 		
+		cout << "Events seen in chamber " << ch << ": " << seen << endl;
+		
+		double eff=0;
+		int nhit=0;
 		hist_eff->Divide(hist_det, hist_exp);
+		
+		for (int binx=0; binx < hist_eff->GetNbinsX(); ++binx) {
+			for (int biny=0; biny < hist_eff->GetNbinsY(); ++biny) {
+				if (hist_eff->GetBinContent(binx+1,biny+1) > 0) {
+					eff+=hist_eff->GetBinContent(binx+1,biny+1);
+					nhit++;
+				}
+			}
+		}
+		
+		eff/=nhit;
+		cout << "Efficiency of chamber " << ch << ": " << eff << endl;
+		
+		for (int binx=0; binx < hist_eff->GetNbinsX(); ++binx) {
+			for (int biny=0; biny < hist_eff->GetNbinsY(); ++biny) {
+				//if (hist_eff->GetBinContent(binx+1, biny+1)==0) hist_eff->SetBinContent(binx+1, biny+1, eff);
+				if (ch==0) if (binx==8 || binx==18 || binx==22) hist_eff->SetBinContent(binx+1, biny+1, 0);
+				if (ch==1) if (binx==9) hist_eff->SetBinContent(binx+1, biny+1, 0);
+				if (ch==2) if (binx==16 || binx==18 || binx==20) hist_eff->SetBinContent(binx+1, biny+1, 0);
+			}
+		}
+		
 		canv_eff->cd();
+		hist_eff->SetStats(kFALSE);
 		hist_eff->Draw("colz");
 		
-		for (int binx=0; binx < hist_det->GetNbinsX(); ++binx) {
-			for (int biny=0; biny < hist_det->GetNbinsY(); ++biny) {
-				cout << hist_eff->GetBinContent(binx+1,biny+1) << " ";
+		cout << endl << "{";
+		for (int binx=0; binx < hist_eff->GetNbinsX(); ++binx) {
+			cout << "{";
+			for (int biny=0; biny < hist_eff->GetNbinsY(); ++biny) {
+				cout << hist_eff->GetBinContent(binx+1,biny+1) << ", ";
 			}
-			cout << endl;
+			cout << "\b\b}, ";
 		}
+		cout << "\b\b}" << endl;
 	}
+	
 	for (int ch=0; ch < chnum; ++ch) {
 		canv_noi[ch]->cd();
 		hist_noi[ch]->Draw("colz");
 	}
 	for (int ch=0; ch < chnum; ++ch) {
 		canv_diffx[ch]->cd();
+		cout << "\n\nx - ch" << ch << ":" << endl;
+		hist_diffx[ch]->Fit("gaus");
 		hist_diffx[ch]->Draw();
 	}
 	for (int ch=0; ch < chnum; ++ch) {
 		canv_diffy[ch]->cd();
+		cout << "\n\ny - ch" << ch << ":" << endl;
+		hist_diffy[ch]->Fit("gaus");
 		hist_diffy[ch]->Draw();
 	}
 }
 
+void print_offset(double offsets[chnum][24])
+{
+	cout << endl << "{";
+	for (int ch=0; ch < chnum; ++ch) {
+		cout << "{";
+		for (int strip=0; strip < 24; ++strip) {
+			cout << offsets[ch][strip] << ", ";
+		}
+		cout << "\b\b}, ";
+	}
+	cout << "\b\b}" << endl;
+}
+
+void thphi_distribution(eeevector evector)
+{
+	eeevector goodevents[3];  // events good for chamber ch
+	eeevector perfevents;     // events with a single hit/ch
+	for (size_t i=0; i != evector.size(); ++i) {  // for every event
+		int counter=0;
+		eeevent event1=evector[i];
+		if (event1.hits[0].size()==1) counter+=1;
+		if (event1.hits[1].size()==1) counter+=2;
+		if (event1.hits[2].size()==1) counter+=4;
+		if (counter==3 || counter==7) goodevents[2].push_back(event1);
+		if (counter==5 || counter==7) goodevents[1].push_back(event1);
+		if (counter==6 || counter==7) goodevents[0].push_back(event1);
+		if (counter==7) perfevents.push_back(event1);
+		if (counter>7) cout << "Unrecognized counter" << endl;
+	}
+	for (int ch=0; ch<3; ++ch) {
+		cout << "Good events for ch" << ch << ": " << goodevents[ch].size() << endl;
+	}
+	cout << "Perfect events: " << perfevents.size() << endl << endl;
+	
+	TCanvas *canv_th = new TCanvas("canv_th","canvas th", 800, 600);
+	TH1D *hist_th = new TH1D("", "Distribuzione in #theta", 100, 0, 90);
+	TCanvas *canv_phi = new TCanvas("canv_phi","canvas eff", 800, 600);
+	TH1D *hist_phi = new TH1D("", "Distribuzione in #phi", 100, 0, 360);
+	
+	for (size_t i=0; i != perfevents.size(); ++i) {  // for every event
+		eeevent event1=perfevents[i];
+		hit hit0 = event1.hits[0][0];
+		hit hit1 = event1.hits[1][0];
+		hit hit2 = event1.hits[2][0];
+		
+		hit hit_test = compute_hitpoint(1, hit0, hit2);
+		if (abs(hit1.x - hit_test.x) <= dx && abs(hit1.y - hit_test.y) <= dy_corr[1]) {
+			double yp = hit0.y-hit2.y;
+			double xp = hit0.x-hit2.x;
+			hist_phi->Fill(atan2(yp, xp)*180/TMath::Pi()+180);
+			
+			double yt = sqrt((hit0.x-hit2.x)*(hit0.x-hit2.x) + (hit0.y-hit2.y)*(hit0.y-hit2.y));
+			double xt = z0-z2;
+			
+			hist_th->Fill(atan2(yt, xt)*180/TMath::Pi());
+		}
+	}
+	canv_phi->cd();
+	hist_phi->Draw();
+	canv_th->cd();
+	hist_th->Draw();
+}
 
 int parser(string path, string mode="eee")
 {
@@ -625,20 +728,28 @@ int parser(string path, string mode="eee")
 	
 	double medians[3][24];
 	double means[3][24];
+	double reported_medians[chnum][24]={  // medians from all the EEE data of 08-03
+		{3.32419, 5.29597, 5.33823, 5.12025, 5.73931, 7.21682, 7.19375, 10.0718, 0, 4.64609, 5.05202, 5.67403, 1.46907, 1.71985, 1.83848, 2.79605, 1.37313, 3.24093, 0, 2.77568, 3.03059, 3.46353, 0, 3.40497},
+		{-4.19656, -4.73269, 13.4538, -4.94234, -3.01792, -1.6836, -1.7194, -1.05278, 3.65286, 0, -2.85605, 1.21787, -4.9753, -2.798, -2.71347, -6.35292, 3.20602, 2.11266, -0.457665, 2.8667, 5.13112, 3.02974, 1.93134, 1.49208},
+		{-3.75076, 1.01684, -2.0115, 0.215216, -0.798211, -2.71105, -1.02473, -4.51589, 4.16105, 1.97378, 1.69023, -0.589424, -3.37038, -3.05634, -5.50312, -5.30694, 0, -3.74178, 0, -3.56896, 0, -4.82906, -5.9285, -5.58281}
+	};
 	
-	for (int i = 0; i < 3; i++) plot_events(i, evector, medians[i], means[i]);
+	//for (int i = 0; i < 3; i++) plot_events(i, evector, medians[i], means[i]);
 	
-	double resolutions[3][24];
-	build_resolutions(resolutions, medians, means);
+	//double resolutions[3][24];
+	//build_resolutions(resolutions, medians, means);
 	
 	//plot_offset(medians, means, resolutions);
 	
-	rescale_offset(evector, medians);
+	rescale_offset(evector, reported_medians);
+	//print_offset(medians);
 	
 	for (int i = 0; i < 3; i++) plot_events(i, evector, medians[i], means[i]);
 	//plot_offset(medians, means, resolutions);
 	
-	single_events_fitter(evector);
+	//efficiency_calculator(evector);
+	
+	thphi_distribution(evector);
 	
 	//cut_y(evector);                // needed just one time
 	//average_hit_number(evector);   // needed just one time
@@ -791,51 +902,6 @@ void compute_eff(int chtest, eeevector evector)
 	cout << "Efficiency: " << (double)detected/expected << endl << endl;
 }
 
-//~ void single_events_fitter(eeevector evector)
-//~ {
-	//~ eeevector goodevents[3];  // events good for chamber ch
-	//~ eeevector perfevents;     // events with a single hit/ch
-	//~ for (size_t i=0; i != evector.size(); ++i) {  // for every event
-		//~ int counter=0;
-		//~ eeevent event1=evector[i];
-		//~ if (event1.hits[0].size()==1) counter+=1;
-		//~ if (event1.hits[1].size()==1) counter+=2;
-		//~ if (event1.hits[2].size()==1) counter+=4;
-		//~ if (counter==3 || counter==7) goodevents[2].push_back(event1);
-		//~ if (counter==5 || counter==7) goodevents[1].push_back(event1);
-		//~ if (counter==6 || counter==7) goodevents[0].push_back(event1);
-		//~ if (counter==7) perfevents.push_back(event1);
-		//~ if (counter>7) cout << "Unrecognized counter" << endl;
-	//~ }
-	//~ for (int ch=0; ch<3; ++ch) {
-		//~ cout << "Good events for ch" << ch << ": " << goodevents[ch].size() << endl;
-	//~ }
-	//~ cout << "Perfect events: " << perfevents.size() << endl << endl;
-	//~ 
-	//~ 
-	//~ for (size_t i=0; i<perfevents.size(); ++i) {              // for every event
-		//~ eeevent event1 = perfrvents[i];
-		//~ hit hit0 = event1.hits[0][0];
-		//~ hit hit1 = event1.hits[1][0];
-		//~ hit hit2 = event1.hits[2][0];
-		//~ hit hit_test = compute_hitpoint(chtest, hit1, hit2);
-		//~ if (hit_test.is_inside(xmax, ymax)) {
-			//~ int counter=0;
-			//~ expected++;
-			//~ hist_exp->Fill(hit_test.x, hit_test.y);
-			//~ for (size_t h=0; h<event1.hits[chtest].size(); ++h) {   // for every hit in chtest
-				//~ hit hitf = event1.hits[chtest][h];
-				//~ double dist = hit_test.distance_from(hitf);
-				//~ if (dist < dist_cutoff) {
-					//~ detected++;
-					//~ hist_det->Fill(hitf.x, hitf.y);
-					//~ counter++;
-				//~ }
-			//~ }
-			//~ hist_nhits->Fill(counter);
-		//~ }
-	//~ }
-//~ }
 */
 /* Code graveyard
 *
