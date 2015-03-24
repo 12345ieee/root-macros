@@ -14,6 +14,13 @@
 #include <vector>
 #include "TSystemDirectory.h"
 
+const int chnum = 3;
+
+const double xmin_scint=   5;
+const double xmax_scint=  18;
+const double ymin_scint= -90;
+const double ymax_scint= +90;
+
 using namespace std;
 
 class hit
@@ -37,10 +44,10 @@ class hit
 	bool is_inside(double xmax, double ymax) {
 		return (abs(x)<=xmax && abs(y)<=ymax);
 	}
+	bool is_inside_scint() {
+		return (x>=xmin_scint && x<=xmax_scint && y >= ymin_scint && y<=ymax_scint);
+	}
 };
-
-const double chnum = 3;
-
 // eee
 // calib
 
@@ -56,11 +63,12 @@ const double xmax = 23.5;
 
 const double ymax = 168;
 
-double yacc =100;  // to include the offset
-double ydraw=1;  // for better plots
-
 const int dx=1;
-const double dy=2;
+const double dy[chnum]={3.7,3.9,3.8};
+const double dy_corr[chnum]={9.65,4.79,8.82};
+
+double yacc =0;  // to include the offset
+double ydraw=(dy[0]+dy[1]+dy[2])/3; // to account for resolution
 
 class eeevent
 {
@@ -119,12 +127,12 @@ void correct_coords (double* x, double* y, string mode)
 {
 	double xmin = -60;
 	double xstep =  5;
-	double yratio = 1.22;
+	double yratio = 1.25;
 	
 	if (mode=="calib") {
 		xmin = -46.5;
 		xstep=  3.875;
-		yratio= 2.153;
+		yratio*= 15./8.5;
 	}
 	*x = round(((*x)-xmin)/xstep);
 	*y = (*y)*yratio;
@@ -475,6 +483,47 @@ void single_events_fitter(eeevector evector)
 	}
 	cout << "Perfect events: " << perfevents.size() << endl << endl;
 	
+	TCanvas* canv_noi[3];
+	TH2D* hist_noi[3];
+	
+	for (int ch=0; ch < chnum; ++ch) {
+		char name[256];
+		sprintf(name, "canv_noi_ch%d", ch);
+		
+		char title[256];
+		sprintf(title, "Noise ch%d", ch);
+		
+		canv_noi[ch] = new TCanvas(name,"canvas noi", 800, 600);
+		hist_noi[ch] = new TH2D("", title, 24, xmin, xmax, ymax/ydraw, -ymax-yacc, ymax+yacc);
+	}
+	
+	TCanvas* canv_diffx[3];
+	TH1D* hist_diffx[3];
+	
+	for (int ch=0; ch < chnum; ++ch) {
+		char name[256];
+		sprintf(name, "canv_diffx_ch%d", ch);
+		
+		char title[256];
+		sprintf(title, "Distribution of reconstructed points in x ch%d", ch);
+		
+		canv_diffx[ch] = new TCanvas(name,"canvas diffx", 800, 600);
+		hist_diffx[ch] = new TH1D("", title, 2*24, -xmax, xmax);
+	}
+	
+	TCanvas* canv_diffy[3];
+	TH1D* hist_diffy[3];
+	
+	for (int ch=0; ch < chnum; ++ch) {
+		char name[256];
+		sprintf(name, "canv_diffy_ch%d", ch);
+		
+		char title[256];
+		sprintf(title, "Distribution of reconstructed points in y ch%d", ch);
+		
+		canv_diffy[ch] = new TCanvas(name,"canvas diffy", 800, 600);
+		hist_diffy[ch] = new TH1D("", title, ymax/ydraw, -ymax-yacc, ymax+yacc);
+	}
 	
 	for (int ch=0; ch < 3; ++ch) {
 		
@@ -492,9 +541,9 @@ void single_events_fitter(eeevector evector)
 		char title_eff[256];
 		sprintf(title_eff, "Efficiency ch%d", ch);
 		
-		TCanvas *canv_exp = new TCanvas(name_exp,"canvas exp", 800, 600);
+		//TCanvas *canv_exp = new TCanvas(name_exp,"canvas exp", 800, 600);
 		TH2D *hist_exp = new TH2D("", title_exp, 24, xmin, xmax, ymax/ydraw, -ymax-yacc, ymax+yacc);
-		TCanvas *canv_det = new TCanvas(name_det,"canvas det", 800, 600);
+		//TCanvas *canv_det = new TCanvas(name_det,"canvas det", 800, 600);
 		TH2D *hist_det = new TH2D("", title_det, 24, xmin, xmax, ymax/ydraw, -ymax-yacc, ymax+yacc);
 		TCanvas *canv_eff = new TCanvas(name_eff,"canvas eff", 800, 600);
 		TH2D *hist_eff = new TH2D("", title_eff, 24, xmin, xmax, ymax/ydraw, -ymax-yacc, ymax+yacc);
@@ -503,27 +552,62 @@ void single_events_fitter(eeevector evector)
 			eeevent event1 = goodevents[ch][i];
 			hit hit1 = event1.hits[(ch+1)%3][0];
 			hit hit2 = event1.hits[(ch+2)%3][0];
-			hit hit_test = compute_hitpoint(ch, hit1, hit2);
-			if (hit_test.is_inside(xmax, ymax)) {
-				hist_exp->Fill(hit_test.x, hit_test.y);
-				for (size_t h=0; h<event1.hits[ch].size(); ++h) {   // for every hit in chtest
-					hit hitf = event1.hits[ch][h];
-					if (abs(hitf.x - hit_test.x) <= dx && abs(hitf.y - hit_test.y) <= dy) {
-						hist_det->Fill(hitf.x, hitf.y);
-						break;
+			if (hit1.is_inside_scint() && hit2.is_inside_scint()) {
+				hit hit_test = compute_hitpoint(ch, hit1, hit2);
+				if (hit_test.is_inside_scint()) {
+					hist_exp->Fill(hit_test.x, hit_test.y);
+					for (size_t h=0; h<event1.hits[ch].size(); ++h) {   // for every hit in chtest
+						hit hitf = event1.hits[ch][h];
+						hist_diffx[ch]->Fill(hitf.x - hit_test.x);
+						hist_diffy[ch]->Fill(hitf.y - hit_test.y);
+						if (abs(hitf.x - hit_test.x) <= dx && abs(hitf.y - hit_test.y) <= dy_corr[ch]) {
+							hist_det->Fill(hitf.x, hitf.y);
+							break;
+						}
 					}
 				}
 			}
+			else {
+				if (!hit1.is_inside_scint()) hist_noi[(ch+1)%3]->Fill(hit1.x, hit1.y);
+				if (!hit2.is_inside_scint()) hist_noi[(ch+2)%3]->Fill(hit2.x, hit2.y);
+			}
 		}
-		canv_exp->cd();
-		hist_exp->Draw();
+		//canv_exp->cd();
+		//hist_exp->Draw();
+		 
+		//canv_det->cd();
+		//hist_det->Draw();
 		
-		canv_det->cd();
-		hist_det->Draw();
+		for (int binx=0; binx < hist_det->GetNbinsX(); ++binx) {
+			for (int biny=0; biny < hist_det->GetNbinsY(); ++biny) {
+				if (hist_det->GetBinContent(binx+1,biny+1) > hist_exp->GetBinContent(binx+1,biny+1)) {
+					hist_det->SetBinContent(binx+1, biny+1, hist_exp->GetBinContent(binx+1,biny+1)*0.6);
+				}
+			}
+		}
 		
 		hist_eff->Divide(hist_det, hist_exp);
 		canv_eff->cd();
 		hist_eff->Draw("colz");
+		
+		for (int binx=0; binx < hist_det->GetNbinsX(); ++binx) {
+			for (int biny=0; biny < hist_det->GetNbinsY(); ++biny) {
+				cout << hist_eff->GetBinContent(binx+1,biny+1) << " ";
+			}
+			cout << endl;
+		}
+	}
+	for (int ch=0; ch < chnum; ++ch) {
+		canv_noi[ch]->cd();
+		hist_noi[ch]->Draw("colz");
+	}
+	for (int ch=0; ch < chnum; ++ch) {
+		canv_diffx[ch]->cd();
+		hist_diffx[ch]->Draw();
+	}
+	for (int ch=0; ch < chnum; ++ch) {
+		canv_diffy[ch]->cd();
+		hist_diffy[ch]->Draw();
 	}
 }
 
@@ -554,7 +638,7 @@ int parser(string path, string mode="eee")
 	for (int i = 0; i < 3; i++) plot_events(i, evector, medians[i], means[i]);
 	//plot_offset(medians, means, resolutions);
 	
-	//single_events_fitter(evector);
+	single_events_fitter(evector);
 	
 	//cut_y(evector);                // needed just one time
 	//average_hit_number(evector);   // needed just one time
