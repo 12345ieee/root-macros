@@ -120,6 +120,11 @@ class eeevent
 	double time() {
 		return secs+1e-9*nsecs;
 	}
+	double delta_time_ms(eeevent& ev1) {
+		int dsecs = this->secs - ev1.secs;
+		int dnsecs = this->nsecs - ev1.nsecs;
+		return dsecs*1000+1e-6*dnsecs;
+	}
 };
 
 typedef vector<eeevent> eeevector;
@@ -294,7 +299,28 @@ void plot_events(int ch, eeevector evector, double* medians, double* means)
 	cout << endl << "Chamber " << ch << ": " << hist->Integral() << " events" << endl << endl;
 }
 
-void plot_offset(double medians[3][24], double means[3][24], double resolutions[3][24])
+void plot_offset(double offsets[3][24])
+{
+	const double strips[24]={0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23}; // yes, I know...
+	for (int ch=0; ch<3 ; ch++) {
+		char name[256];
+		sprintf(name, "canv_off_ch%d", ch);
+		
+		char title[256];
+		sprintf(title, "Offset ch%d", ch);
+		
+		TCanvas *canv = new TCanvas(name,"canvas off", 800, 600);
+		TGraph *g_res = new TGraph(24, strips, offsets[ch]);
+		g_res->SetTitle(title);
+		g_res->GetXaxis()->SetLimits(xmin, xmax);
+		g_res->GetXaxis()->SetTitle("x (# strip)");
+		g_res->GetYaxis()->SetTitle("Offset (cm)");
+		canv->cd();
+		g_res->Draw("AB");
+	}
+}
+
+void plot_offsets(double medians[3][24], double means[3][24], double resolutions[3][24])
 {
 	const double strips[24]={0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23}; // yes, I know...
 	for (int ch=0; ch<3 ; ch++) {
@@ -339,14 +365,6 @@ void plot_offset(double medians[3][24], double means[3][24], double resolutions[
 	}
 }
 
-void build_resolutions(double resolutions[3][24], double medians[3][24], double means[3][24])
-{
-	for (int ch=0; ch<3; ++ch) {
-		for (int strip=0; strip<24; ++strip) {
-			resolutions[ch][strip] = abs(medians[ch][strip] - means[ch][strip]);
-		}
-	}
-}
 
 void rescale_offset(eeevector& evector, double offsets[3][24])
 {
@@ -667,22 +685,12 @@ void print_offset(double offsets[chnum][24])
 
 void thphi_distribution(eeevector evector)
 {
-	eeevector goodevents[3];  // events good for chamber ch
 	eeevector perfevents;     // events with a single hit/ch
 	for (size_t i=0; i != evector.size(); ++i) {  // for every event
-		int counter=0;
 		eeevent event1=evector[i];
-		if (event1.hits[0].size()==1) counter+=1;
-		if (event1.hits[1].size()==1) counter+=2;
-		if (event1.hits[2].size()==1) counter+=4;
-		if (counter==3 || counter==7) goodevents[2].push_back(event1);
-		if (counter==5 || counter==7) goodevents[1].push_back(event1);
-		if (counter==6 || counter==7) goodevents[0].push_back(event1);
-		if (counter==7) perfevents.push_back(event1);
-		if (counter>7) cout << "Unrecognized counter" << endl;
-	}
-	for (int ch=0; ch<3; ++ch) {
-		cout << "Good events for ch" << ch << ": " << goodevents[ch].size() << endl;
+		if (event1.hits[0].size()==1
+		&&  event1.hits[1].size()==1
+		&&  event1.hits[2].size()==1) perfevents.push_back(event1);
 	}
 	cout << "Perfect events: " << perfevents.size() << endl << endl;
 	
@@ -715,6 +723,43 @@ void thphi_distribution(eeevector evector)
 	hist_th->Draw();
 }
 
+double fitfun(double* arg, double* par)
+{
+	double tm=par[0];
+	double N=par[1];
+	double cexp=par[2];
+	double x=*arg;
+	
+	if (x < tm) return 0;
+	return N*exp(-cexp*x);
+}
+
+void time_distrib(eeevector evector)
+{
+	TCanvas *canv_time = new TCanvas("canv_time","canvas time", 800, 600);
+	TH1D *hist_time = new TH1D("", "Distribuzione in tempo", 1000, 0, 500);
+	
+	if (evector.size()<2) return;
+	for (size_t ev=1; ev != evector.size(); ++ev) {  // for every event
+		eeevent ev1=evector[ev-1];
+		eeevent ev2=evector[ev];
+		double dt = ev2.delta_time_ms(ev1);
+		//cout << dt << endl;
+		hist_time->Fill(dt);
+	}
+	hist_time->GetXaxis()->SetTitle("Distanza in tempo (ms)");
+	hist_time->GetYaxis()->SetTitle("Eventi");
+	canv_time->SetLogy();
+	canv_time->cd();
+	
+	TF1 *fexp = new TF1("Fexp", fitfun, 0, 500, 3);
+	fexp->SetParameters(10, 1000, 0.02);
+	fexp->SetParNames("tm", "Norm", "cexp");
+	fexp->SetNpx(1000); // more points
+	hist_time->Fit(fexp);
+	hist_time->Draw();
+}
+
 int parser(string path, string mode="eee")
 {
 	
@@ -726,8 +771,8 @@ int parser(string path, string mode="eee")
 		exit(1);
 	}
 	
-	double medians[3][24];
-	double means[3][24];
+	//double medians[3][24];
+	//double means[3][24];
 	double reported_medians[chnum][24]={  // medians from all the EEE data of 08-03
 		{3.32419, 5.29597, 5.33823, 5.12025, 5.73931, 7.21682, 7.19375, 10.0718, 0, 4.64609, 5.05202, 5.67403, 1.46907, 1.71985, 1.83848, 2.79605, 1.37313, 3.24093, 0, 2.77568, 3.03059, 3.46353, 0, 3.40497},
 		{-4.19656, -4.73269, 13.4538, -4.94234, -3.01792, -1.6836, -1.7194, -1.05278, 3.65286, 0, -2.85605, 1.21787, -4.9753, -2.798, -2.71347, -6.35292, 3.20602, 2.11266, -0.457665, 2.8667, 5.13112, 3.02974, 1.93134, 1.49208},
@@ -736,33 +781,24 @@ int parser(string path, string mode="eee")
 	
 	//for (int i = 0; i < 3; i++) plot_events(i, evector, medians[i], means[i]);
 	
-	//double resolutions[3][24];
-	//build_resolutions(resolutions, medians, means);
-	
 	//plot_offset(medians, means, resolutions);
 	
 	rescale_offset(evector, reported_medians);
-	//print_offset(medians);
+	plot_offset(reported_medians);
 	
-	for (int i = 0; i < 3; i++) plot_events(i, evector, medians[i], means[i]);
-	//plot_offset(medians, means, resolutions);
+	//for (int i = 0; i < 3; i++) plot_events(i, evector, medians[i], means[i]);
+	//plot_offsets(medians, means, resolutions);
 	
 	//efficiency_calculator(evector);
 	
-	thphi_distribution(evector);
+	//thphi_distribution(evector);
+	
+	//time_distrib(evector);
 	
 	//cut_y(evector);                // needed just one time
 	//average_hit_number(evector);   // needed just one time
 	//voltage(evector);              // needed just one time
 	 
-	//for (int i = 0; i < 3; i++) compute_eff(i, evector);
-	
-	
-	//single_events_fitter(evector);
-	
-	//cluster_size_study(evector);
-	//evector = clusterize(evector, cluster_size);
-	
 	return 0;
 }
 
@@ -906,6 +942,15 @@ void compute_eff(int chtest, eeevector evector)
 /* Code graveyard
 *
 * 
+* 
+void build_resolutions(double resolutions[3][24], double medians[3][24], double means[3][24])
+{
+	for (int ch=0; ch<3; ++ch) {
+		for (int strip=0; strip<24; ++strip) {
+			resolutions[ch][strip] = abs(medians[ch][strip] - means[ch][strip]);
+		}
+	}
+}
 * 
 	hitvector hvector;
 	switch (nchamber) {
