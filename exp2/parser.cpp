@@ -692,12 +692,14 @@ void thphi_distribution(eeevector evector)
 		&&  event1.hits[1].size()==1
 		&&  event1.hits[2].size()==1) perfevents.push_back(event1);
 	}
-	cout << "Perfect events: " << perfevents.size() << endl << endl;
+	cout << "Perfect events: " << perfevents.size() << endl;
 	
 	TCanvas *canv_th = new TCanvas("canv_th","canvas th", 800, 600);
 	TH1D *hist_th = new TH1D("", "Distribuzione in #theta", 100, 0, 90);
 	TCanvas *canv_phi = new TCanvas("canv_phi","canvas eff", 800, 600);
 	TH1D *hist_phi = new TH1D("", "Distribuzione in #phi", 100, 0, 360);
+	
+	int Nev=0;
 	
 	for (size_t i=0; i != perfevents.size(); ++i) {  // for every event
 		eeevent event1=perfevents[i];
@@ -715,12 +717,17 @@ void thphi_distribution(eeevector evector)
 			double xt = z0-z2;
 			
 			hist_th->Fill(atan2(yt, xt)*180/TMath::Pi());
+			
+			Nev++;
 		}
 	}
+	cout << "Valid events: " << Nev << endl << endl;
+	
 	canv_phi->cd();
 	hist_phi->Draw();
 	canv_th->cd();
 	hist_th->Draw();
+	
 }
 
 double fitfun(double* arg, double* par)
@@ -784,14 +791,14 @@ int parser(string path, string mode="eee")
 	//plot_offset(medians, means, resolutions);
 	
 	rescale_offset(evector, reported_medians);
-	plot_offset(reported_medians);
+	//plot_offset(reported_medians);
 	
 	//for (int i = 0; i < 3; i++) plot_events(i, evector, medians[i], means[i]);
 	//plot_offsets(medians, means, resolutions);
 	
 	//efficiency_calculator(evector);
 	
-	//thphi_distribution(evector);
+	thphi_distribution(evector);
 	
 	//time_distrib(evector);
 	
