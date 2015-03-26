@@ -111,15 +111,26 @@ double Traccia(int N_volte, int mode){
 						}
 						else if (mode==3) {
 							int x_1=floor(x1/xstep);
-							int x_3=floor(x3/xstep);
-							Na++;
-							
-							double yt = sqrt((x_1-x_3)*(x_1-x_3)*xstep*xstep + (y1-y3)*(y1-y3));
-							h2->Fill(atan2(yt, zt)*180/TMath::Pi());
-							
-							double yp = (y1-y3);
-							double xp = (x_1-x_3)*xstep;
-							h1->Fill(atan2(yp, xp)*180/TMath::Pi()+180);
+							int y_1=floor(y1/ystep);
+							//cout << x_1 << " - " << y_1 << endl;
+							if (rand->Uniform(0, 1) < eff1[x_1][y_1]) {
+								int x_2=floor(x2/xstep);
+								int y_2=floor(y2/ystep);
+								if (rand->Uniform(0, 1) < eff2[x_2][y_2]) {
+									int x_3=floor(x3/xstep);
+									int y_3=floor(y3/ystep);
+									if (rand->Uniform(0, 1) < eff3[x_3][y_3]) {
+										Na++;
+										
+										double yt = sqrt((x_1-x_3)*(x_1-x_3)*xstep*xstep + (y1-y3)*(y1-y3));
+										h2->Fill(atan2(yt, zt)*180/TMath::Pi());
+										
+										double yp = (y1-y3);
+										double xp = (x_1-x_3)*xstep;
+										h1->Fill(atan2(yp, xp)*180/TMath::Pi()+180);
+									}
+								}
+							}
 						}
 					}
 				}

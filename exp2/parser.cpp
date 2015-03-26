@@ -67,7 +67,7 @@ const int dx=1;
 const double dy[chnum]={1.5,1.6,1.5};
 const double dy_corr[chnum]={7.8, 3.8, 6.6}; // 2 sigma
 
-const double yacc =0;  // to include the offset
+const double yacc =20;  // to include the offset
 const double yres = (dy[0]+dy[1]+dy[2])/3;
 const double ydraw= yres/2*4; // to account for resolution
 
@@ -383,9 +383,9 @@ void cut_y(eeevector& evector)
 {
 	for (int ch=0; ch < 3; ++ch) {
 		char title[256];
-		sprintf(title, "Events ch%d", ch);
+		sprintf(title, "Riscalamento lungo y ch%d", ch+1); //IT
 		
-		TH2D *hist = new TH2D("", title, 24, xmin, xmax, ymax/ydraw, -ymax-yacc, ymax+yacc);
+		TH2D *hist = new TH2D("", title, 24, xmin, xmax, ymax, -ymax-yacc, ymax+yacc);
 		
 		for (size_t i=0; i<evector.size(); ++i) {              // for every event
 			eeevent event1 = evector[i];
@@ -400,12 +400,14 @@ void cut_y(eeevector& evector)
 		sprintf(name, "canv_cut_ch%d", ch);
 		
 		char titley[256];
-		sprintf(titley, "Y projection ch%d", ch);
+		sprintf(titley, "Proiezione Y ch%d", ch+1); //IT
 		
 		TCanvas *canv = new TCanvas(name, "canvas pr", 800, 600);	
 		canv->cd();
 		
 		TH1D *histy = hist->ProjectionY(titley);
+		histy->SetXTitle("Coordinata Y (cm)");
+		histy->SetYTitle("Eventi");
 		histy->Draw();
 	}
 }
@@ -417,11 +419,11 @@ void average_hit_number(eeevector evector)
 		sprintf(name, "canv_hits_ch%d", ch);
 		
 		char title[256];
-		sprintf(title, "Hit number ch%d", ch);
+		sprintf(title, "Numero medio di hit ch%d", ch+1); // IT
 		
 		TCanvas *canv = new TCanvas(name,"canvas", 800, 600);
 		int nbins=20;
-		TH1I *hist = new TH1I("", title, nbins, 0, nbins);
+		TH1I *hist = new TH1I("", title, nbins, 0, nbins/2);
 		
 		for (size_t i=0; i != evector.size(); ++i) {  // for every event
 			int nhits=evector[i].hits[ch].size();
@@ -429,6 +431,8 @@ void average_hit_number(eeevector evector)
 		}
 		
 		canv->cd();
+		hist->SetXTitle("Numero di hit");
+		hist->SetYTitle("Eventi");
 		hist->Draw();
 	}
 }
@@ -518,7 +522,7 @@ void efficiency_calculator(eeevector evector)
 		hist_noi[ch] = new TH2D("", title, 24, xmin, xmax, ymax/ydraw, -ymax-yacc, ymax+yacc);
 	}
 	
-	TCanvas* canv_diffx[3];
+	//TCanvas* canv_diffx[3];
 	TH1D* hist_diffx[3];
 	
 	for (int ch=0; ch < chnum; ++ch) {
@@ -528,11 +532,11 @@ void efficiency_calculator(eeevector evector)
 		char title[256];
 		sprintf(title, "Distribution of reconstructed points in x ch%d", ch);
 		
-		canv_diffx[ch] = new TCanvas(name,"canvas diffx", 800, 600);
+		//canv_diffx[ch] = new TCanvas(name,"canvas diffx", 800, 600);
 		hist_diffx[ch] = new TH1D("", title, 2*24, -xmax, xmax);
 	}
 	
-	TCanvas* canv_diffy[3];
+	//TCanvas* canv_diffy[3];
 	TH1D* hist_diffy[3];
 	
 	for (int ch=0; ch < chnum; ++ch) {
@@ -540,10 +544,12 @@ void efficiency_calculator(eeevector evector)
 		sprintf(name, "canv_diffy_ch%d", ch);
 		
 		char title[256];
-		sprintf(title, "Distribution of reconstructed points in y ch%d", ch);
+		sprintf(title, "Distribuzione dei punti ricostruiti in y ch%d", ch+1); //IT
 		
-		canv_diffy[ch] = new TCanvas(name,"canvas diffy", 800, 600);
+		//canv_diffy[ch] = new TCanvas(name,"canvas diffy", 800, 600);
 		hist_diffy[ch] = new TH1D("", title, ymax, -ymax-yacc, ymax+yacc);
+		hist_diffy[ch]->SetXTitle("Distanza dal punto misurato (cm)");
+		hist_diffy[ch]->SetYTitle("Eventi");
 	}
 	
 	for (int ch=0; ch < 3; ++ch) {
@@ -641,33 +647,33 @@ void efficiency_calculator(eeevector evector)
 		hist_eff->SetStats(kFALSE);
 		hist_eff->Draw("colz");
 		
-		cout << endl << "{";
-		for (int binx=0; binx < hist_eff->GetNbinsX(); ++binx) {
-			cout << "{";
-			for (int biny=0; biny < hist_eff->GetNbinsY(); ++biny) {
-				cout << hist_eff->GetBinContent(binx+1,biny+1) << ", ";
-			}
-			cout << "\b\b}, ";
-		}
-		cout << "\b\b}" << endl;
+		//~ cout << endl << "{";
+		//~ for (int binx=0; binx < hist_eff->GetNbinsX(); ++binx) {
+			//~ cout << "{";
+			//~ for (int biny=0; biny < hist_eff->GetNbinsY(); ++biny) {
+				//~ cout << hist_eff->GetBinContent(binx+1,biny+1) << ", ";
+			//~ }
+			//~ cout << "\b\b}, ";
+		//~ }
+		//~ cout << "\b\b}" << endl;
 	}
 	
 	for (int ch=0; ch < chnum; ++ch) {
 		canv_noi[ch]->cd();
 		hist_noi[ch]->Draw("colz");
 	}
-	for (int ch=0; ch < chnum; ++ch) {
-		canv_diffx[ch]->cd();
-		cout << "\n\nx - ch" << ch << ":" << endl;
-		hist_diffx[ch]->Fit("gaus");
-		hist_diffx[ch]->Draw();
-	}
-	for (int ch=0; ch < chnum; ++ch) {
-		canv_diffy[ch]->cd();
-		cout << "\n\ny - ch" << ch << ":" << endl;
-		hist_diffy[ch]->Fit("gaus");
-		hist_diffy[ch]->Draw();
-	}
+	//~ for (int ch=0; ch < chnum; ++ch) {
+		//~ canv_diffx[ch]->cd();
+		//~ cout << "\n\nx - ch" << ch << ":" << endl;
+		//~ hist_diffx[ch]->Fit("gaus");
+		//~ hist_diffx[ch]->Draw();
+	//~ }
+	//~ for (int ch=0; ch < chnum; ++ch) {
+		//~ canv_diffy[ch]->cd();
+		//~ cout << "\n\ny - ch" << ch << ":" << endl;
+		//~ hist_diffy[ch]->Fit("gaus");
+		//~ hist_diffy[ch]->Draw();
+	//~ }
 }
 
 void print_offset(double offsets[chnum][24])
@@ -695,9 +701,13 @@ void thphi_distribution(eeevector evector)
 	cout << "Perfect events: " << perfevents.size() << endl;
 	
 	TCanvas *canv_th = new TCanvas("canv_th","canvas th", 800, 600);
-	TH1D *hist_th = new TH1D("", "Distribuzione in #theta", 100, 0, 90);
+	TH1D *hist_th = new TH1D("", "Distribuzione in #theta", 101, 0, 90); //IT
+	hist_th->SetXTitle("#theta (°)");
+	hist_th->SetYTitle("Eventi");
 	TCanvas *canv_phi = new TCanvas("canv_phi","canvas eff", 800, 600);
-	TH1D *hist_phi = new TH1D("", "Distribuzione in #phi", 100, 0, 360);
+	TH1D *hist_phi = new TH1D("", "Distribuzione in #phi", 101, 0, 360); // IT
+	hist_phi->SetXTitle("#phi (°)");
+	hist_phi->SetYTitle("Eventi");
 	
 	int Nev=0;
 	
@@ -710,10 +720,10 @@ void thphi_distribution(eeevector evector)
 		hit hit_test = compute_hitpoint(1, hit0, hit2);
 		if (abs(hit1.x - hit_test.x) <= dx && abs(hit1.y - hit_test.y) <= dy_corr[1]) {
 			double yp = hit0.y-hit2.y;
-			double xp = hit0.x-hit2.x;
+			double xp = (hit0.x-hit2.x)*3.2;
 			hist_phi->Fill(atan2(yp, xp)*180/TMath::Pi()+180);
 			
-			double yt = sqrt((hit0.x-hit2.x)*(hit0.x-hit2.x) + (hit0.y-hit2.y)*(hit0.y-hit2.y));
+			double yt = sqrt((hit0.x-hit2.x)*(hit0.x-hit2.x)*3.2*3.2 + (hit0.y-hit2.y)*(hit0.y-hit2.y));
 			double xt = z0-z2;
 			
 			hist_th->Fill(atan2(yt, xt)*180/TMath::Pi());
@@ -749,10 +759,14 @@ void time_distrib(eeevector evector)
 	if (evector.size()<2) return;
 	for (size_t ev=1; ev != evector.size(); ++ev) {  // for every event
 		eeevent ev1=evector[ev-1];
-		eeevent ev2=evector[ev];
-		double dt = ev2.delta_time_ms(ev1);
-		//cout << dt << endl;
-		hist_time->Fill(dt);
+		if (ev1.hits[0].size()!=0 && ev1.hits[1].size()!=0 && ev1.hits[2].size()!=0) {
+			eeevent ev2=evector[ev];
+			 if (ev2.hits[0].size()!=0 && ev2.hits[1].size()!=0 && ev2.hits[2].size()!=0) { 
+				double dt = ev2.delta_time_ms(ev1);
+				//cout << dt << endl;
+				hist_time->Fill(dt);
+			}
+		}
 	}
 	hist_time->GetXaxis()->SetTitle("Distanza in tempo (ms)");
 	hist_time->GetYaxis()->SetTitle("Eventi");
@@ -798,12 +812,12 @@ int parser(string path, string mode="eee")
 	
 	//efficiency_calculator(evector);
 	
-	thphi_distribution(evector);
+	//thphi_distribution(evector);
 	
 	//time_distrib(evector);
 	
 	//cut_y(evector);                // needed just one time
-	//average_hit_number(evector);   // needed just one time
+	average_hit_number(evector);   // needed just one time
 	//voltage(evector);              // needed just one time
 	 
 	return 0;
