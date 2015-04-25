@@ -1,1 +1,11 @@
+# Example folder
 esempi_morello/*
+
+# Precompiled
+*.o
+*.d
+*.so
+*.pcm
+
+# Output PDFs
+*.pdf
