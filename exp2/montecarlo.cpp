@@ -38,10 +38,10 @@ using namespace std;
 double Traccia(int N_volte, int mode){
 
 	TRandom *rand= new TRandom ();
-	TCanvas *c1 = new TCanvas("c1","multipads",900,700);
-	TCanvas *c2 = new TCanvas("c2","multipads",900,700);
+	TCanvas *c1 = new TCanvas("c1","multipads",800,600);
+	TCanvas *c2 = new TCanvas("c2","multipads",800,600);
 	TF1 *f1= new TF1 ("f1", "sin(x)*pow(cos(x),2)", 0, TMath::Pi()/2);
-	TH1D *h1= new TH1D ("Phi", "Distribuzione in Phi", 100, 0, 360);
+	TH1D *h1= new TH1D ("Phi", "Distribuzione in Phi", 78, 0, 360);
 	TH1D *h2= new TH1D ("Theta", "Distribuzione in Theta",100 , 0, 90);
 
 	int N;
@@ -142,6 +142,7 @@ double Traccia(int N_volte, int mode){
 
 	c1->cd();
 	h1->SetXTitle("Phi[deg]");
+	h1->SetMinimum(0);
 	h1->SetYTitle("Eventi");
 	h1->Draw();
 
@@ -174,7 +175,7 @@ double Traccia(int N_volte, int mode){
 
 void montecarlo(int mode=0)
 {
-	int N_volte=10000000;
+	int N_volte=10200000;
 	std::cout << std::endl << "Mode: " << mode << std::endl;
 	printf("L'accettanza è %f\n", Traccia(N_volte, mode));
 }

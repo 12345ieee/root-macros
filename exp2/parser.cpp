@@ -67,7 +67,7 @@ const int dx=1;
 const double dy[chnum]={1.5,1.6,1.5};
 const double dy_corr[chnum]={7.8, 3.8, 6.6}; // 2 sigma
 
-const double yacc =20;  // to include the offset
+const double yacc =0;  // to include the offset
 const double yres = (dy[0]+dy[1]+dy[2])/3;
 const double ydraw= yres/2*4; // to account for resolution
 
@@ -277,6 +277,8 @@ void plot_events(int ch, eeevector evector, double* medians, double* means)
 	
 	canv->cd();
 	hist->SetStats(kFALSE);
+	hist->SetXTitle("Coordinata x (# strip)");
+	hist->SetYTitle("Coordinata y (cm)");
 	hist->Draw("colz");
 	
 	
@@ -522,7 +524,7 @@ void efficiency_calculator(eeevector evector)
 		hist_noi[ch] = new TH2D("", title, 24, xmin, xmax, ymax/ydraw, -ymax-yacc, ymax+yacc);
 	}
 	
-	//TCanvas* canv_diffx[3];
+	TCanvas* canv_diffx[3];
 	TH1D* hist_diffx[3];
 	
 	for (int ch=0; ch < chnum; ++ch) {
@@ -530,13 +532,15 @@ void efficiency_calculator(eeevector evector)
 		sprintf(name, "canv_diffx_ch%d", ch);
 		
 		char title[256];
-		sprintf(title, "Distribution of reconstructed points in x ch%d", ch);
+		sprintf(title, "Distribuzione dei punti ricostruiti in x ch%d", ch+1); //IT
 		
-		//canv_diffx[ch] = new TCanvas(name,"canvas diffx", 800, 600);
+		canv_diffx[ch] = new TCanvas(name,"canvas diffx", 800, 600);
 		hist_diffx[ch] = new TH1D("", title, 2*24, -xmax, xmax);
+		hist_diffx[ch]->SetXTitle("Distanza dal punto misurato (# strip)");
+		hist_diffx[ch]->SetYTitle("Eventi");
 	}
 	
-	//TCanvas* canv_diffy[3];
+	TCanvas* canv_diffy[3];
 	TH1D* hist_diffy[3];
 	
 	for (int ch=0; ch < chnum; ++ch) {
@@ -546,7 +550,7 @@ void efficiency_calculator(eeevector evector)
 		char title[256];
 		sprintf(title, "Distribuzione dei punti ricostruiti in y ch%d", ch+1); //IT
 		
-		//canv_diffy[ch] = new TCanvas(name,"canvas diffy", 800, 600);
+		canv_diffy[ch] = new TCanvas(name,"canvas diffy", 800, 600);
 		hist_diffy[ch] = new TH1D("", title, ymax, -ymax-yacc, ymax+yacc);
 		hist_diffy[ch]->SetXTitle("Distanza dal punto misurato (cm)");
 		hist_diffy[ch]->SetYTitle("Eventi");
@@ -645,6 +649,8 @@ void efficiency_calculator(eeevector evector)
 		
 		canv_eff->cd();
 		hist_eff->SetStats(kFALSE);
+		hist_eff->SetXTitle("Coordinata x (# strip)");
+		hist_eff->SetYTitle("Coordinata y (cm)");
 		hist_eff->Draw("colz");
 		
 		//~ cout << endl << "{";
@@ -660,20 +666,22 @@ void efficiency_calculator(eeevector evector)
 	
 	for (int ch=0; ch < chnum; ++ch) {
 		canv_noi[ch]->cd();
+		hist_noi[ch]->SetXTitle("Coordinata x (# strip)");
+		hist_noi[ch]->SetYTitle("Coordinata y (cm)");
 		hist_noi[ch]->Draw("colz");
 	}
-	//~ for (int ch=0; ch < chnum; ++ch) {
-		//~ canv_diffx[ch]->cd();
-		//~ cout << "\n\nx - ch" << ch << ":" << endl;
-		//~ hist_diffx[ch]->Fit("gaus");
-		//~ hist_diffx[ch]->Draw();
-	//~ }
-	//~ for (int ch=0; ch < chnum; ++ch) {
-		//~ canv_diffy[ch]->cd();
-		//~ cout << "\n\ny - ch" << ch << ":" << endl;
-		//~ hist_diffy[ch]->Fit("gaus");
-		//~ hist_diffy[ch]->Draw();
-	//~ }
+	for (int ch=0; ch < chnum; ++ch) {
+		canv_diffx[ch]->cd();
+		cout << "\n\nx - ch" << ch << ":" << endl;
+		hist_diffx[ch]->Fit("gaus");
+		hist_diffx[ch]->Draw();
+	}
+	for (int ch=0; ch < chnum; ++ch) {
+		canv_diffy[ch]->cd();
+		cout << "\n\ny - ch" << ch << ":" << endl;
+		hist_diffy[ch]->Fit("gaus");
+		hist_diffy[ch]->Draw();
+	}
 }
 
 void print_offset(double offsets[chnum][24])
@@ -705,9 +713,10 @@ void thphi_distribution(eeevector evector)
 	hist_th->SetXTitle("#theta (°)");
 	hist_th->SetYTitle("Eventi");
 	TCanvas *canv_phi = new TCanvas("canv_phi","canvas eff", 800, 600);
-	TH1D *hist_phi = new TH1D("", "Distribuzione in #phi", 101, 0, 360); // IT
-	hist_phi->SetXTitle("#phi (°)");
+	TH1D *hist_phi = new TH1D("", "Distribuzione in #phi", 78, 0, 360); // IT
+	hist_phi->SetXTitle("#phi [deg]");
 	hist_phi->SetYTitle("Eventi");
+	hist_phi->SetMinimum(0);
 	
 	int Nev=0;
 	
@@ -792,8 +801,8 @@ int parser(string path, string mode="eee")
 		exit(1);
 	}
 	
-	//double medians[3][24];
-	//double means[3][24];
+	double medians[3][24];
+	double means[3][24];
 	double reported_medians[chnum][24]={  // medians from all the EEE data of 08-03
 		{3.32419, 5.29597, 5.33823, 5.12025, 5.73931, 7.21682, 7.19375, 10.0718, 0, 4.64609, 5.05202, 5.67403, 1.46907, 1.71985, 1.83848, 2.79605, 1.37313, 3.24093, 0, 2.77568, 3.03059, 3.46353, 0, 3.40497},
 		{-4.19656, -4.73269, 13.4538, -4.94234, -3.01792, -1.6836, -1.7194, -1.05278, 3.65286, 0, -2.85605, 1.21787, -4.9753, -2.798, -2.71347, -6.35292, 3.20602, 2.11266, -0.457665, 2.8667, 5.13112, 3.02974, 1.93134, 1.49208},
@@ -812,12 +821,12 @@ int parser(string path, string mode="eee")
 	
 	//efficiency_calculator(evector);
 	
-	//thphi_distribution(evector);
+	thphi_distribution(evector);
 	
 	//time_distrib(evector);
 	
 	//cut_y(evector);                // needed just one time
-	average_hit_number(evector);   // needed just one time
+	//average_hit_number(evector);   // needed just one time
 	//voltage(evector);              // needed just one time
 	 
 	return 0;
@@ -872,91 +881,6 @@ void chamber_assign(int chtest, int* ch1, int* ch2)
 		case 2: *ch1 = 0; *ch2 = 1; break;
 		default: cout << "Unrecognized chamber" << endl;
 	}
-}
-
-void compute_eff(int chtest, eeevector evector)
-{
-	const double dist_cutoff=3;
-	
-	char name_exp[256];
-	sprintf(name_exp, "canv_exp_ch%d", chtest);
-	char name_det[256];
-	sprintf(name_det, "canv_det_ch%d", chtest);
-	char name_eff[256];
-	sprintf(name_eff, "canv_eff_ch%d", chtest);
-	
-	char title_exp[256];
-	sprintf(title_exp, "Expected ch%d", chtest);
-	char title_det[256];
-	sprintf(title_det, "Detected ch%d", chtest);
-	char title_eff[256];
-	sprintf(title_eff, "Efficiency ch%d", chtest);
-	
-	TCanvas *canv_exp = new TCanvas(name_exp,"canvas exp", 800, 600);
-	TH2D *hist_exp = new TH2D("", title_exp, 100, xmin, xmax, 1000, -ymax, ymax);
-	TCanvas *canv_det = new TCanvas(name_det,"canvas det", 800, 600);
-	TH2D *hist_det = new TH2D("", title_det, 100, xmin, xmax, 1000, -ymax, ymax);
-	TCanvas *canv_eff = new TCanvas(name_eff,"canvas eff", 800, 600);
-	TH2D *hist_eff = new TH2D("", title_eff, 100, xmin, xmax, 1000, -ymax, ymax);
-	
-	int expected=0;
-	int detected=0;
-	
-	int ch1, ch2;
-	chamber_assign(chtest, &ch1, &ch2);
-	
-	char name_nhits[256];
-	sprintf(name_nhits, "canv_nhits_ch%d", chtest);
-	char title_nhits[256];
-	sprintf(title_eff, "Hits number ch%d", chtest);
-	
-	TCanvas *canv_nhits = new TCanvas(name_nhits,"canvas nits", 800, 600);
-	TH1D *hist_nhits = new TH1D("", title_nhits, 10, 0, 10);
-	
-	for (size_t i=0; i<evector.size(); ++i) {              // for every event
-		eeevent event1 = evector[i];
-		for (size_t j=0; j<event1.hits[ch1].size(); ++j) {   // for every hit in ch1
-			hit hit1 = event1.hits[ch1][j];
-			for (size_t k=0; k<event1.hits[ch2].size(); ++k) {   // for every hit in ch2
-				hit hit2 = event1.hits[ch2][k];
-				hit hit_test = compute_hitpoint(chtest, hit1, hit2);
-				if (hit_test.is_inside(xmax, ymax)) {
-					int counter=0;
-					expected++;
-					hist_exp->Fill(hit_test.x, hit_test.y);
-					for (size_t h=0; h<event1.hits[chtest].size(); ++h) {   // for every hit in chtest
-						hit hitf = event1.hits[chtest][h];
-						double dist = hit_test.distance_from(hitf);
-						if (dist < dist_cutoff) {
-							detected++;
-							hist_det->Fill(hitf.x, hitf.y);
-							counter++;
-						}
-					}
-					hist_nhits->Fill(counter);
-				}
-			}
-		}
-	}
-	
-	canv_nhits->cd();
-	hist_nhits->Draw();
-	
-	canv_exp->cd();
-	hist_exp->Draw();
-	
-	canv_det->cd();
-	hist_det->Draw();
-	
-	hist_eff->Divide(hist_det, hist_exp);
-	canv_eff->cd();
-	hist_eff->Draw("colz");
-	
-	cout << "Chamber " << chtest << ":" << endl;
-	cout << "Distance cutoff chosen: " << dist_cutoff << endl;
-	cout << "Expected events: " << expected << endl;
-	cout << "Detected events: " << detected << endl;
-	cout << "Efficiency: " << (double)detected/expected << endl << endl;
 }
 
 */
