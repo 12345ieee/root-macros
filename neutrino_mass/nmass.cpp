@@ -75,7 +75,8 @@ double cgaus(double x, double s)
 	return TMath::Gaus(x, 0, s, kTRUE);
 }
 
-const int nsteps = 100;
+const int nsteps  = 100;
+const int nsigmas = 4;
 
 const double emin = 18.5504;  // min of file
 const double emax = 18.6176;  // max of file
@@ -94,7 +95,7 @@ double kconv(double* arg, double* par)
 	double m=par[2];
 	double s=par[3];
 	
-	double min = pmin - 4*s;
+	double min = pmin - nsigmas*s;
 	
 	double interval = Q - m - min;
 	double step = interval/nsteps;
@@ -139,8 +140,8 @@ void nmass(string filename="kurie.dat")
 	
 	TF1* f = new TF1("kurie", kconv, pmin, pmax, 4);
 	f->SetParNames("A", "Q", "m", "sigma");
-	//               A    Q  m     sigma
-	f->SetParameters(5e7, Q, 0.03, sigma);
+	//                 A    Q  m     sigma
+	f->SetParameters(1.5e7, Q, 0.03, sigma);
 	f->FixParameter(1, Q);
 	f->FixParameter(3, sigma);
 	
