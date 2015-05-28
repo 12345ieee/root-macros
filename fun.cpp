@@ -53,3 +53,8 @@ void fun()
 	//leg->Draw();
 	
 }
+
+int main()
+{
+	fun();
+}
