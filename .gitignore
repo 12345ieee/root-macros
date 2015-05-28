@@ -9,3 +9,6 @@ esempi_morello/*
 
 # Output PDFs
 *.pdf
+
+# Rootfiles
+*.root

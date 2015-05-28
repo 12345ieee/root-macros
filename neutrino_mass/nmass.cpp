@@ -2,6 +2,7 @@
 #include <fstream>
 #include "TH1.h"
 #include "TF1.h"
+#include "TMath.h"
 #include "TCanvas.h"
 #include "TFitResult.h"
 
@@ -52,7 +53,7 @@ void gun(string filename="gun.dat")
 	for (int i=0; i<3; ++i) {
 		sigma[i] = pResult->Value(3*i+2)*1000;
 		errSigma[i] = pResult->ParError(3*i+2)*1000;
-			cout << "Resolution" << i+1 << " = (" << sigma[i] << " \\pm " << errSigma[i] << ") meV" << endl;
+			cout << "Resolution" << i+1 << " = (" << sigma[i] << " \\pm " << errSigma[i] << ") eV" << endl;
 		num += sigma[i]/errSigma[i]/errSigma[i];
 		den += 1/errSigma[i]/errSigma[i];
 	}
@@ -60,20 +61,62 @@ void gun(string filename="gun.dat")
 	
 	double resolution = num/den;
 	double errResolution = 1/sqrt(den);
-	cout << endl << "Resolution = (" << resolution << " \\pm " << errResolution << ") meV" << endl;
+	cout << endl << "Resolution = (" << resolution << " \\pm " << errResolution << ") eV" << endl;
+}
+
+double kurie(double x, double A, double Q, double m)
+{
+	if (x > abs(Q-m)) return 0;
+	return A*x*(Q-x)*sqrt((Q-x)*(Q-x)-m*m);
+}
+
+double cgaus(double x, double s)
+{
+	return TMath::Gaus(x, 0, s, kTRUE);
+}
+
+const int nsteps = 100;
+
+const double emin = 18.5504;  // min of file
+const double emax = 18.6176;  // max of file
+const double estep=  0.0008;  // step for file
+
+const int    nbins= 85;       // should be (emax-emin)/estep + 1
+
+const double pmin = 18.55;   // min of plot: emin-estep/2
+const double pmax = 18.618;  // max of plot: emax+estep/2
+
+double kconv(double* arg, double* par)
+{
+	double x=arg[0];
+	double A=par[0];
+	double Q=par[1];
+	double m=par[2];
+	double s=par[3];
+	
+	double min = pmin - 4*s;
+	
+	double interval = Q - m - min;
+	double step = interval/nsteps;
+	
+	double hsum=0;
+	double y = min + step/2; 
+	
+	for (int i=0; i<nsteps; ++i, y += step) {
+		double Gy = cgaus(x-y, s);
+		double Ky = kurie(y, A, Q, m);
+		//cout << y << " - " << Gy << " - " << Ky << endl;
+		hsum+=Gy*Ky;
+	}
+	return hsum*step;
 }
 
 void nmass(string filename="kurie.dat")
 {
-	// res from before: (10.009 \pm 0.008) meV
-	double sigma = 0.01; // in eV, keep it simple
-	
-	const double emin = 18.5504;  // min of file
-	const double emax = 18.6176;  // max of file
-	const double estep=  0.0008;  // step for file
-	const int    nbins= (emax-emin)/estep + estep;  // should be 85
-	const double pmin = emin-estep/2;  // min of plot 18.55
-	const double pmax = emax+estep/2;  // max of plot 18.618
+	// res from before: (10.009 \pm 0.008) eV
+	double sigma = 0.01; // in KeV, keep it simple
+	// Q from Giudici's assignment: 18.600 +- 0.005 KeV
+	double Q = 18.600;   // in KeV
 	
 	ifstream file;
 	file.open(filename.c_str());
@@ -90,19 +133,19 @@ void nmass(string filename="kurie.dat")
 	
 	while (!file.eof()) {
 		file >> energy >> nevents;
-		//cout << energy << " - "<< nevents << endl;
 		for (int i=0; i<nevents; ++i)
 			hk->Fill(energy);
 	}
 	
-	/*TF1* f = new TF1("3gauss", "gaus(0)+gaus(3)+gaus(6)", emin, emax);
-	f->SetParameters(
-		13300, 18.55, 0.01,
-		17700, 18.60, 0.01,
-		 8900, 18.65, 0.01);
+	TF1* f = new TF1("kurie", kconv, pmin, pmax, 4);
+	f->SetParNames("A", "Q", "m", "sigma");
+	//               A    Q  m     sigma
+	f->SetParameters(5e7, Q, 0.03, sigma);
+	f->FixParameter(1, Q);
+	f->FixParameter(3, sigma);
 	
-	TFitResultPtr pResult = hk->Fit(f, "S"); // "S" gets a hold of the result data
-	*/
+	TFitResultPtr pResult = hk->Fit(f, "LS"); // "S" gets a hold of the result data
+	
 	canv->cd();
 	canv->SetLogy();
 	hk->Draw("PE");
