@@ -75,8 +75,8 @@ double cgaus(double x, double s)
 	return TMath::Gaus(x, 0, s, kTRUE);
 }
 
-const int nsteps  = 100;
-const int nsigmas = 4;
+const int nsteps  = 10000;
+const int nsigmas = 5;
 
 const double emin = 18.5504;  // min of file
 const double emax = 18.6176;  // max of file
@@ -101,7 +101,8 @@ double kconv(double* arg, double* par)
 	double step = interval/nsteps;
 	
 	double hsum=0;
-	double y = min + step/2; 
+	//~ double y = min + step/2;
+	double y = min+step/2; 
 	
 	for (int i=0; i<nsteps; ++i, y += step) {
 		double Gy = cgaus(x-y, s);
@@ -115,9 +116,11 @@ double kconv(double* arg, double* par)
 void nmass(string filename="kurie.dat")
 {
 	// res from before: (10.009 \pm 0.008) eV
-	double sigma = 0.01; // in KeV, keep it simple
+	double  sigma = 0.01; // in KeV, keep it simple
+	double dsigma = 8e-6; // in KeV
 	// Q from Giudici's assignment: 18.600 +- 0.005 KeV
-	double Q = 18.600;   // in KeV
+	double Q = 18.600;    // in KeV
+	double dQ = 0.005;    // in KeV
 	
 	ifstream file;
 	file.open(filename.c_str());
@@ -139,15 +142,21 @@ void nmass(string filename="kurie.dat")
 	}
 	
 	TF1* f = new TF1("kurie", kconv, pmin, pmax, 4);
-	f->SetParNames("A", "Q", "m", "sigma");
+	f->SetParNames("A", "Q", "massa_nu", "risoluzione");
 	//                 A    Q  m     sigma
 	f->SetParameters(1.5e7, Q, 0.03, sigma);
 	f->FixParameter(1, Q);
 	f->FixParameter(3, sigma);
+	//~ f->SetParLimits(1, Q-dQ, Q+dQ);
+	//~ f->SetParLimits(3, sigma-dsigma, sigma+dsigma);
 	
 	TFitResultPtr pResult = hk->Fit(f, "LS"); // "S" gets a hold of the result data
 	
+	pResult->Print("V");
+	
 	canv->cd();
 	canv->SetLogy();
+	hk->GetXaxis()->SetTitle("Energia (keV)");
+	hk->GetYaxis()->SetTitle("dN/dE");
 	hk->Draw("PE");
 }
