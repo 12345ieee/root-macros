@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+
+path="/home/andreas/Progetti/root-macros/open_in_TBrowser"
+
+root -l $@ ${path}/open_in_TBrowser.cpp

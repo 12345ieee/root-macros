@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=TBrowser
+Comment=Open ROOT files in TBrowser
+TryExec=root
+Exec=x-terminal-emulator -x root_open %U
+Terminal=false
+Type=Application
+Categories=Science;
